@@ -52,7 +52,7 @@ export function mountTaskApp(container) // -> { destroy() }
 ```
 
 - `container` must be an `HTMLElement`; otherwise throw `TypeError("mountTaskApp requires an HTMLElement container")`.
-- Each mount owns isolated state: `{ tasks: [], activeFilter: "all", nextTaskId: 1 }`.
+- Once task behavior is introduced, each mount owns isolated state: `{ tasks: [], activeFilter: "all", nextTaskId: 1 }`.
 - Each task is `{ id: number, title: string, completed: boolean }`.
 - `destroy()` removes listeners installed by the mount and empties only that mount's container.
 - Tests use only DOM interactions and `destroy()`; do not expose internal task state for testing.
@@ -218,21 +218,21 @@ Open `http://localhost:4173/tests/stage-0/task-app.test.html`.
 
 Expected before `app.js` exists: the browser reports a module load failure for `/src/stage-0/app.js`; the test page cannot pass. Ask the learner why ES modules require HTTP serving rather than opening the file directly.
 
-- [ ] **Step 4: Learner builds only the mount shell**
+- [ ] **Step 4: Learner builds the smallest mount shell that can pass the smoke tests**
 
 Ask the learner to write `src/stage-0/app.js` by hand. The implementation for this task must do only the following:
 
 ```text
 mountTaskApp(container)
   validate that container is an HTMLElement
-  create isolated empty state for this mount
-  create the form, input, hidden error region, summary, empty list, and three filter buttons
-  set the All filter to aria-pressed=true and the other filters to false
+  create the form and task input
+  create summary text "0 of 0 completed"
+  create an empty task list
   attach the shell to container
-  return destroy(), which removes installed listeners and empties container
+  return destroy(), which empties container
 ```
 
-Do not implement task submission, toggling, or filtering yet. Review that no state is stored globally and that a second mount would receive separate state.
+Do not create task rows, error UI, filter buttons, task state, or event handlers yet. Those behaviors do not have failing tests in this task. Review that a second mount can be created and destroyed without affecting the first container.
 
 - [ ] **Step 5: Create the visible page and minimal styles**
 
@@ -276,7 +276,6 @@ main {
 }
 
 form,
-[data-task-filters],
 [data-task-row] {
   display: flex;
   gap: 0.75rem;
@@ -297,13 +296,6 @@ form,
   opacity: 0.65;
 }
 
-[aria-pressed="true"] {
-  font-weight: 700;
-}
-
-[data-task-error] {
-  color: #c62828;
-}
 ```
 
 - [ ] **Step 6: Verify and commit the foundation**
@@ -324,7 +316,7 @@ git commit -m "chore(stage-0): add browser workshop foundation"
 - Modify: `tests/stage-0/task-app.test.js`
 
 **Interfaces:**
-- Consumes: the Task 1 mount shell and its private `{ tasks, activeFilter, nextTaskId }` state.
+- Consumes: the Task 1 mount shell.
 - Produces: form submission that appends `{ id, title, completed: false }`, creates one DOM row, and updates the summary.
 
 - [ ] **Step 1: Add failing creation and validation tests before `run()`**
@@ -387,7 +379,9 @@ Expected: the two existing tests pass; task creation fails because no row is app
 
 - [ ] **Step 3: Learner implements the submit path by hand**
 
-Required event flow:
+Before registering the submit handler, extend the mount setup with private `tasks = []` and `nextTaskId = 1` variables plus a hidden `[data-task-error]` region.
+
+Required submit-event flow:
 
 ```text
 submit event
@@ -405,6 +399,14 @@ submit event
 
 The row must be created with `document.createElement` and inserted with a browser DOM operation. Do not rebuild the whole list, assign a serialized HTML string containing the task title, or introduce a general render function.
 
+Add the error-region rule to `src/stage-0/styles.css` in this task:
+
+```css
+[data-task-error] {
+  color: #c62828;
+}
+```
+
 - [ ] **Step 4: Review normal and edge behavior**
 
 Ask the learner:
@@ -420,7 +422,7 @@ Expected: `4/4 tests passed`; the HTML-looking title is displayed as text and do
 - [ ] **Step 5: Commit task creation**
 
 ```bash
-git add src/stage-0/app.js tests/stage-0/task-app.test.js
+git add src/stage-0/app.js src/stage-0/styles.css tests/stage-0/task-app.test.js
 git commit -m "feat(stage-0): add imperative task creation"
 ```
 
@@ -495,6 +497,7 @@ git commit -m "feat(stage-0): synchronize task completion"
 **Files:**
 - Modify: `src/stage-0/app.js`
 - Modify: `tests/stage-0/task-app.test.js`
+- Modify: `src/stage-0/styles.css`
 
 **Interfaces:**
 - Consumes: private `activeFilter`, task completion state, row task identities, and filter buttons.
@@ -559,6 +562,8 @@ completed -> task.completed is true
 Required filter-button event flow:
 
 ```text
+create private activeFilter = "all" state when the app mounts
+create a [data-task-filters] group with All, Active, and Completed buttons when the app mounts
 read the clicked button's data-filter value
 reject any value outside all|active|completed with Error("Unknown filter: VALUE")
 store the new activeFilter
@@ -567,6 +572,14 @@ for every task row: find its task, evaluate the predicate, set row.hidden to the
 ```
 
 The task-submit and task-toggle paths must also apply the current visibility predicate after their own state changes. This duplication is intentional evidence for Stage 0; do not solve it with a general renderer.
+
+Add the filter-button style in this task:
+
+```css
+[aria-pressed="true"] {
+  font-weight: 700;
+}
+```
 
 - [ ] **Step 4: Run automated and visible verification**
 
@@ -585,7 +598,7 @@ Confirm keyboard focus is visible, filter buttons are real buttons, checkboxes h
 - [ ] **Step 5: Commit filtering behavior**
 
 ```bash
-git add src/stage-0/app.js tests/stage-0/task-app.test.js
+git add src/stage-0/app.js src/stage-0/styles.css tests/stage-0/task-app.test.js
 git commit -m "feat(stage-0): add imperative task filters"
 ```
 
