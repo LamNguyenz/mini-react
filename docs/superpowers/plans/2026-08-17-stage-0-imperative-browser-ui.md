@@ -362,6 +362,7 @@ test("blank input leaves state and DOM unchanged", () => {
     submitTitle(fixture, "   ");
     assertEqual(taskRows(fixture).length, 0);
     const error = fixture.querySelector("[data-task-error]");
+    assert(error, "validation message is missing");
     assertEqual(error.hidden, false);
     assertEqual(error.textContent, "Enter a task.");
     assertEqual(fixture.querySelector("[data-task-summary]").textContent, "0 of 0 completed");
