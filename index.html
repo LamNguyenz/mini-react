@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Mini React — Stage 0</title>
+        <link rel="stylesheet" href="./src/stage-0/styles.css" />
+    </head>
+    <body>
+        <main id="app"></main>
+        <script type="module">
+            import { mountTaskApp } from "./src/stage-0/app.js";
+
+            const app = document.getElementById("app");
+            mountTaskApp(app);
+        </script>
+    </body>
+</html>
