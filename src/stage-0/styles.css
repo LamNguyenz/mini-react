@@ -22,3 +22,12 @@ form {
     padding: 0;
     list-style: none;
 }
+
+[data-task-row] {
+    display: flex;
+    gap: 0.75rem;
+}
+
+[data-task-error] {
+    color: #c62828;
+}
