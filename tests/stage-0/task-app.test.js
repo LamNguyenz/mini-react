@@ -101,4 +101,34 @@ test("toggling a task synchronizes its row and the derived summary", () => {
   }
 });
 
+test("filters stay synchronized when completion changes", () => {
+  const { fixture, cleanup } = mountFixture();
+  try {
+    submitTitle(fixture, "Read beginWork");
+    submitTitle(fixture, "Read completeWork");
+    const [firstRow, secondRow] = taskRows(fixture);
+
+    fixture.querySelector('[data-filter="active"]').click();
+    firstRow.querySelector("[data-task-toggle]").click();
+    assertEqual(firstRow.hidden, true, "completed row should leave the active view");
+    assertEqual(secondRow.hidden, false, "active row should remain visible");
+    assertEqual(fixture.querySelector("[data-task-summary]").textContent, "1 of 2 completed");
+
+    fixture.querySelector('[data-filter="completed"]').click();
+    assertEqual(firstRow.hidden, false, "completed row should be visible");
+    assertEqual(secondRow.hidden, true, "active row should be hidden");
+    assertEqual(
+      fixture.querySelector('[data-filter="completed"]').getAttribute("aria-pressed"),
+      "true",
+    );
+
+    fixture.querySelector('[data-filter="all"]').click();
+    assertEqual(firstRow.hidden, false);
+    assertEqual(secondRow.hidden, false);
+    assertEqual(fixture.querySelectorAll('[aria-pressed="true"]').length, 1);
+  } finally {
+    cleanup();
+  }
+});
+
 run();

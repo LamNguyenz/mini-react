@@ -4,6 +4,7 @@ export function mountTaskApp(container) {
   }
   const tasks = [];
   let nextTaskId = 1;
+  let activeFilter = "all";
 
   const form = document.createElement("form");
   form.dataset.taskForm = "";
@@ -22,7 +23,28 @@ export function mountTaskApp(container) {
 
   const list = document.createElement("ul");
   list.dataset.taskList = "";
-  container.append(form, error, summary, list);
+
+  const filters = document.createElement("div");
+  filters.dataset.taskFilters = "";
+
+  const filterOptions = [
+    { value: "all", label: "All" },
+    { value: "active", label: "Active" },
+    { value: "completed", label: "Completed" },
+  ];
+
+  for (const option of filterOptions) {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.dataset.filter = option.value;
+    button.textContent = option.label;
+    button.setAttribute("aria-pressed", String(option.value === activeFilter));
+
+    filters.append(button);
+  }
+
+  container.append(form, error, filters, summary, list);
 
   function updateSummary() {
     const countComplete = tasks.filter((task) => task.completed).length;
@@ -38,12 +60,14 @@ export function mountTaskApp(container) {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.dataset.taskToggle = "";
+    checkbox.id = `task-${task.id}`;
 
-    const titleNode = document.createElement("span");
+    const titleNode = document.createElement("label");
+    titleNode.htmlFor = checkbox.id;
     titleNode.dataset.taskTitle = "";
-    titleNode.textContent = task.title;
+    titleNode.append(checkbox, task.title);
 
-    row.append(checkbox, titleNode);
+    row.append(titleNode);
     return row;
   }
 
@@ -71,11 +95,20 @@ export function mountTaskApp(container) {
     error.hidden = true;
     const task = createTask(title);
     const row = createTaskRow(task);
+
+    row.hidden = !taskMatchesFilter(task);
     list.appendChild(row);
     updateSummary();
 
     input.value = "";
     input.focus();
+  }
+
+  const validFilters = ["all", "completed", "active"];
+  function taskMatchesFilter(task) {
+    if (activeFilter === "all") return true;
+    if (activeFilter === "active") return !task.completed;
+    return task.completed;
   }
 
   function handleTaskChange(event) {
@@ -84,25 +117,58 @@ export function mountTaskApp(container) {
 
     const row = checkbox.closest("[data-task-row]");
     const taskId = row.dataset.taskId;
+    const task = getTaskById(taskId);
 
-    const taskIndex = tasks.findIndex((task) => task.id === Number(taskId));
-    if (taskIndex === -1) {
-      throw new Error(`Unknown task id: ${taskId}`);
-    }
-
-    const task = tasks[taskIndex];
     task.completed = checkbox.checked;
     row.dataset.completed = String(task.completed);
+    row.hidden = !taskMatchesFilter(task);
     updateSummary();
+  }
+
+  function getTaskById(taskId) {
+    const task = tasks.find((task) => task.id === Number(taskId));
+    if (!task) {
+      throw new Error(`Unknown task id: ${taskId}`);
+    }
+    return task;
+  }
+
+  function handleFilterClick(event) {
+    const button = event.target;
+    if (!button.matches("[data-filter]")) return;
+
+    const filter = button.dataset.filter;
+
+    if (!validFilters.includes(filter)) {
+      throw new Error(`Unknown filter: ${filter}`);
+    }
+
+    activeFilter = filter;
+
+    for (const filterButton of filters.querySelectorAll("[data-filter]")) {
+      filterButton.setAttribute(
+        "aria-pressed",
+        String(filterButton.dataset.filter === activeFilter),
+      );
+    }
+
+    for (const row of list.querySelectorAll("[data-task-row]")) {
+      const taskId = Number(row.dataset.taskId);
+      const task = getTaskById(taskId);
+
+      row.hidden = !taskMatchesFilter(task);
+    }
   }
 
   form.addEventListener("submit", handleSubmit);
   list.addEventListener("change", handleTaskChange);
+  filters.addEventListener("click", handleFilterClick);
 
   return {
     destroy() {
       form.removeEventListener("submit", handleSubmit);
       list.removeEventListener("change", handleTaskChange);
+      filters.removeEventListener("click", handleFilterClick);
       container.replaceChildren();
     },
   };

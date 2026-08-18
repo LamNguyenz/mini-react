@@ -27,7 +27,19 @@ form {
     display: flex;
     gap: 0.75rem;
 }
+[data-task-row][hidden] {
+    display: none;
+}
 
 [data-task-error] {
     color: #c62828;
+}
+
+[data-task-filters] {
+    display: flex;
+    gap: 0.75rem;
+}
+
+[aria-pressed="true"] {
+    font-weight: 700;
 }
