@@ -22,7 +22,6 @@ export function mountTaskApp(container) {
 
   const list = document.createElement("ul");
   list.dataset.taskList = "";
-
   container.append(form, error, summary, list);
 
   function updateSummary() {
@@ -78,11 +77,32 @@ export function mountTaskApp(container) {
     input.value = "";
     input.focus();
   }
+
+  function handleTaskChange(event) {
+    const checkbox = event.target;
+    if (!checkbox.matches("[data-task-toggle]")) return;
+
+    const row = checkbox.closest("[data-task-row]");
+    const taskId = row.dataset.taskId;
+
+    const taskIndex = tasks.findIndex((task) => task.id === Number(taskId));
+    if (taskIndex === -1) {
+      throw new Error(`Unknown task id: ${taskId}`);
+    }
+
+    const task = tasks[taskIndex];
+    task.completed = checkbox.checked;
+    row.dataset.completed = String(task.completed);
+    updateSummary();
+  }
+
   form.addEventListener("submit", handleSubmit);
+  list.addEventListener("change", handleTaskChange);
 
   return {
     destroy() {
       form.removeEventListener("submit", handleSubmit);
+      list.removeEventListener("change", handleTaskChange);
       container.replaceChildren();
     },
   };

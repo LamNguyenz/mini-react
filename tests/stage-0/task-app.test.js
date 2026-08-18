@@ -85,4 +85,20 @@ test("blank input leaves state and DOM unchanged", () => {
   }
 });
 
+test("toggling a task synchronizes its row and the derived summary", () => {
+  const { fixture, cleanup } = mountFixture();
+  try {
+    submitTitle(fixture, "Trace createRoot");
+    submitTitle(fixture, "Trace commitRoot");
+    const [firstRow] = taskRows(fixture);
+    firstRow.querySelector("[data-task-toggle]").click();
+
+    assertEqual(firstRow.dataset.completed, "true");
+    assertEqual(firstRow.querySelector("[data-task-toggle]").checked, true);
+    assertEqual(fixture.querySelector("[data-task-summary]").textContent, "1 of 2 completed");
+  } finally {
+    cleanup();
+  }
+});
+
 run();
