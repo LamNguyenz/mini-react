@@ -70,6 +70,23 @@ test("submitting a title appends an active task", () => {
   }
 });
 
+test("clicking the visible submit control adds a task", () => {
+  const { fixture, cleanup } = mountFixture();
+  try {
+    fixture.querySelector("[data-task-input]").value = "Use visible controls";
+    const submitButton = fixture.querySelector(
+      '[data-task-form] button[type="submit"]',
+    );
+
+    assert(submitButton, "submit button is missing");
+    submitButton.click();
+
+    assertEqual(taskRows(fixture).length, 1);
+  } finally {
+    cleanup();
+  }
+});
+
 test("blank input leaves state and DOM unchanged", () => {
   const { fixture, cleanup } = mountFixture();
   try {

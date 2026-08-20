@@ -17,6 +17,12 @@ export function mountTaskApp(container) {
   input.dataset.taskInput = "";
   form.append(input);
 
+  const submitButton = document.createElement("button");
+  submitButton.type = "submit";
+  submitButton.dataset.taskSubmit = "";
+  submitButton.textContent = "Add task";
+  form.append(submitButton);
+
   const summary = document.createElement("p");
   summary.dataset.taskSummary = "";
   summary.textContent = "0 of 0 completed";
