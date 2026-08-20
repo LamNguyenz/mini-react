@@ -149,53 +149,53 @@ React source landmark: `packages/react-reconciler/src/ReactChildFiber.js`.
 
 Exit criterion: the learner can predict reuse, insertion, movement, and deletion from type and key identity.
 
-### Stage 3: Fiber and Interruptible Work
+### Stage 3: Pre-Hooks Component State and Lifecycles
 
-Problem: recursive rendering is one synchronous call stack and cannot yield to the browser.
+Problem: application closure state does not compose into independently reusable component instances, while component state and lifecycle behavior must persist across renders.
 
-Build: Fiber nodes, parent/child/sibling links, units of work, `beginWork`, `completeWork`, a cooperative work loop, and current/work-in-progress trees.
+Build: reconciled component-instance records, initial state, queued state updates, a synchronous `setState`-style API, and deliberately small mount, update, and unmount lifecycle moments. Historical APIs are studied, but obsolete surface syntax is not copied unless it reveals a mechanism.
 
-Evidence of the problem: a sufficiently large render delays input and browser work; dividing the work allows yielding and resuming.
+Evidence of the problem: state stored only in render-time function calls disappears, while state stored only in application closures cannot follow multiple component identities safely.
 
-React source landmarks: `ReactFiberWorkLoop.js`, `ReactFiberBeginWork.js`, and `ReactFiberCompleteWork.js`.
+React source landmarks: `ReactBaseClasses.js`, `ReactFiberClassComponent.js`, and `ReactFiberClassUpdateQueue.js`.
 
-Exit criterion: the learner can manually trace traversal order and explain why Fiber is both a data structure and a unit of work.
+Exit criterion: the learner can explain how pre-Hooks React associated state and lifecycle work with a persistent component identity.
 
-### Stage 4: Scheduling, Queues, and Priorities
+### Stage 4: Fiber, Work Units, and Commit Separation
 
-Problem: updates differ in urgency, and interrupted work may become stale.
+Problem: recursive rendering is one synchronous call stack, and browser mutations performed during that traversal cannot be safely abandoned or resumed.
 
-Build: cooperative scheduling, root scheduling, update queues, batching, priority classes, interruption, restart behavior, and a deliberately small lane model.
+Build: Fiber nodes, parent/child/sibling links, units of work, `beginWork`, `completeWork`, current/work-in-progress trees, effect flags, and a separate mutation commit walk.
 
-Evidence of the problem: urgent input should not wait behind background rendering, and newer updates must not be lost when work restarts.
+Evidence of the problem: a sufficiently large render delays browser work, while an abandoned render must not leak partial DOM mutations.
 
-React source landmarks: `scheduleUpdateOnFiber`, the `scheduler` package, and React lane modules.
+React source landmarks: `ReactFiberWorkLoop.js`, `ReactFiberBeginWork.js`, `ReactFiberCompleteWork.js`, `commitRoot`, and `ReactFiberCommitWork.js`.
 
-Exit criterion: the learner can explain when work is queued, selected, interrupted, resumed, restarted, and committed.
+Exit criterion: the learner can trace traversal and commit order and explain why Fiber is a persistent data structure, a unit of work, and a boundary that makes deferred mutation possible.
 
-### Stage 5: Hooks and Persistent Component State
+### Stage 5: Hooks and Effect APIs
 
-Problem: function calls are temporary, but component state and effects must persist in stable order across renders.
+Problem: function component calls are temporary, but state, refs, and effects must persist without class instances and must retain stable positional identity.
 
-Build: hook storage on Fiber, `useState`, update queues, eager state where useful, batching, `useReducer`, refs, effect lists, cleanup, and hook-order validation.
+Build: hook storage on Fiber, `useState`, update queues, `useReducer`, refs, effect lists, cleanup, and hook-order validation. Effects reuse the render/commit separation established in Stage 4.
 
-Evidence of the problem: conditional hook calls break positional identity; stale closures and queued updates reveal why state dispatch is not direct assignment.
+Evidence of the problem: conditional hook calls break positional identity; stale closures and queued updates reveal why dispatch is not direct assignment; cleanup ordering reveals why effects cannot run during render.
 
 React source landmark: `packages/react-reconciler/src/ReactFiberHooks.js`.
 
-Exit criterion: the learner can trace a state dispatch through its queue and explain hook ordering without relying on slogans.
+Exit criterion: the learner can trace a state dispatch through its queue, explain hook ordering, and predict basic effect setup and cleanup timing without relying on slogans.
 
-### Stage 6: Commit Phases and Effects
+### Stage 6: Concurrent Scheduling, Priorities, and Lanes
 
-Problem: render work may be abandoned, so visible mutations and effects cannot safely happen during render.
+Problem: updates differ in urgency, long work blocks input, and interrupted work may become stale.
 
-Build: effect flags, a completed effect walk, before-mutation work, mutation work, layout effects, passive effects, refs, and cleanup ordering.
+Build: cooperative scheduling, root scheduling, batching, priority classes, interruption, restart behavior, transitions, and a deliberately small lane model.
 
-Evidence of the problem: performing visible mutations during interruptible rendering exposes partial or abandoned work.
+Evidence of the problem: urgent input should not wait behind background rendering, and newer updates must not be lost when work pauses or restarts.
 
-React source landmarks: `commitRoot`, `ReactFiberCommitWork.js`, host commit effects, and DOM host configuration.
+React source landmarks: `scheduleUpdateOnFiber`, the `scheduler` package, React lane modules, and transition update paths.
 
-Exit criterion: the learner can distinguish render and commit responsibilities and predict effect timing.
+Exit criterion: the learner can explain when work is queued, selected, interrupted, resumed, restarted, and committed, and why lanes extend the earlier Fiber architecture.
 
 ### Stage 7: Selected Production Mechanisms
 
