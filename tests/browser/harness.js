@@ -16,6 +16,19 @@ export function assertEqual(actual, expected, message = "Values differ") {
   }
 }
 
+export function assertThrows(callback, ErrorType, message) {
+  let thrown;
+  try {
+    callback();
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert(thrown instanceof ErrorType, `expected ${ErrorType.name}`);
+  if (message !== undefined) assertEqual(thrown.message, message);
+  return thrown;
+}
+
 export async function run() {
   const results = document.querySelector("[data-test-results]");
   let failures = 0;
