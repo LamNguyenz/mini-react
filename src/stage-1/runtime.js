@@ -1,10 +1,7 @@
 function normalizeChildren(children) {
   return children
     .flat(Infinity)
-    .filter(
-      (child) =>
-        child != null && typeof child !== "boolean",
-    )
+    .filter((child) => child != null && typeof child !== "boolean")
     .map((child) => (typeof child === "number" ? String(child) : child));
 }
 
@@ -40,6 +37,45 @@ export function createRoot(container) {
   return { render, unmount };
 }
 
+function applyProp(node, name, value) {
+  if (name === "children") {
+    return;
+  }
+
+  const directProperties = [
+    "value",
+    "checked",
+    "hidden",
+    "type",
+    "id",
+    "className",
+    "htmlFor",
+  ];
+
+  if (directProperties.includes(name)) {
+    node[name] = value;
+    return;
+  }
+
+  if (name.startsWith("data-") || name.startsWith("aria-")) {
+    node.setAttribute(name, String(value));
+    return;
+  }
+
+  const eventNames = {
+    onClick: "click",
+    onSubmit: "submit",
+    onChange: "change",
+  };
+
+  if (name in eventNames) {
+    node.addEventListener(eventNames[name], value);
+    return;
+  }
+
+  throw TypeError(`Unsupported prop: ${name}`);
+}
+
 function renderDescription(description) {
   if (description == null || typeof description === "boolean") {
     return null;
@@ -65,6 +101,11 @@ function renderDescription(description) {
 
   if (typeof description == "object" && typeof description.type === "string") {
     const node = document.createElement(description.type);
+
+    for (const [name, value] of Object.entries(description.props)) {
+      applyProp(node, name, value);
+    }
+
     const children = renderDescription(description.props.children);
 
     if (children != null) {

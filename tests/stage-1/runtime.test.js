@@ -108,4 +108,87 @@ test("createElement rejects an unsupported type", () => {
   );
 });
 
+test("applies supported DOM props, attributes, and events", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let clicks = 0;
+  let submits = 0;
+  let changes = 0;
+
+  try {
+    root.render(
+      createElement(
+        "form",
+        {
+          className: "task-form",
+          "data-task-form": "",
+          onSubmit(event) {
+            event.preventDefault();
+            submits += 1;
+          },
+        },
+        createElement("input", {
+          id: "task-toggle",
+          type: "checkbox",
+          value: "yes",
+          checked: true,
+          hidden: false,
+          "aria-label": "Task toggle",
+          onChange() {
+            changes += 1;
+          },
+        }),
+        createElement("label", { htmlFor: "task-toggle" }, "Task"),
+        createElement(
+          "button",
+          {
+            type: "submit",
+            onClick() {
+              clicks += 1;
+            },
+          },
+          "Add task",
+        ),
+      ),
+    );
+
+    const form = fixture.querySelector("form");
+    const input = fixture.querySelector("input");
+    const button = fixture.querySelector("button");
+    assertEqual(form.className, "task-form");
+    assertEqual(form.hasAttribute("data-task-form"), true);
+    assertEqual(input.id, "task-toggle");
+    assertEqual(input.type, "checkbox");
+    assertEqual(input.value, "yes");
+    assertEqual(input.checked, true);
+    assertEqual(input.hidden, false);
+    assertEqual(input.getAttribute("aria-label"), "Task toggle");
+    assertEqual(fixture.querySelector("label").htmlFor, "task-toggle");
+
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    button.click();
+    assertEqual(changes, 1);
+    assertEqual(clicks, 1);
+    assertEqual(submits, 1);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects an unsupported DOM prop", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  try {
+    assertThrows(
+      () => root.render(createElement("div", { title: "unsupported" })),
+      TypeError,
+      "Unsupported prop: title",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();
