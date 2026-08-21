@@ -1,3 +1,27 @@
+function normalizeChildren(children) {
+  return children
+    .flat(Infinity)
+    .filter(
+      (child) =>
+        child != null && typeof child !== "boolean",
+    )
+    .map((child) => (typeof child === "number" ? String(child) : child));
+}
+
+export function createElement(type, props, ...children) {
+  if (!(typeof type == "string" || typeof type == "function")) {
+    throw new TypeError("createElement requires a string or function type");
+  }
+  const copiedProps = { ...props };
+  return {
+    type,
+    props: {
+      ...copiedProps,
+      children: normalizeChildren(children),
+    },
+  };
+}
+
 export function createRoot(container) {
   if (!(container instanceof HTMLElement)) {
     throw new TypeError("createRoot requires an HTMLElement container");

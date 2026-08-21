@@ -4,7 +4,7 @@ import {
   run,
   test,
 } from "../browser/harness.js";
-import { createRoot } from "../../src/stage-1/runtime.js";
+import { createElement, createRoot } from "../../src/stage-1/runtime.js";
 
 function createFixture() {
   const fixture = document.createElement("div");
@@ -78,6 +78,34 @@ test("rejects an unsupported child description", () => {
     root.unmount();
     fixture.remove();
   }
+});
+
+test("createElement returns a normalized description without creating DOM", () => {
+  const child = createElement("span", null, "B");
+  const element = createElement(
+    "section",
+    { id: "tasks" },
+    "A",
+    "",
+    [[[0, [null, [false, child]]]]],
+  );
+
+  assertEqual(element.type, "section");
+  assertEqual(element.props.id, "tasks");
+  assertEqual(element.props.children.length, 4);
+  assertEqual(element.props.children[0], "A");
+  assertEqual(element.props.children[1], "");
+  assertEqual(element.props.children[2], "0");
+  assertEqual(element.props.children[3], child);
+  assertEqual(document.querySelector("#tasks"), null);
+});
+
+test("createElement rejects an unsupported type", () => {
+  assertThrows(
+    () => createElement({}, null),
+    TypeError,
+    "createElement requires a string or function type",
+  );
 });
 
 run();
