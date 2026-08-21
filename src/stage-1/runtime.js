@@ -20,10 +20,15 @@ export function createElement(type, props, ...children) {
 }
 
 export function createRoot(container) {
+  let isUnmount = false
+
   if (!(container instanceof HTMLElement)) {
     throw new TypeError("createRoot requires an HTMLElement container");
   }
   function render(element) {
+    if (isUnmount) {
+      throw Error("Cannot render an unmounted root")
+    }
     const node = renderDescription(element);
     if (node === null) {
       container.replaceChildren();
@@ -32,6 +37,8 @@ export function createRoot(container) {
     }
   }
   function unmount() {
+    if (isUnmount) return;
+    isUnmount = true;
     container.replaceChildren();
   }
   return { render, unmount };

@@ -221,4 +221,62 @@ test("invokes function components with props and normalized children", () => {
   }
 });
 
+test("a second render replaces the previous DOM identity", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  try {
+    root.render(createElement("input", { id: "draft", value: "first" }));
+    const firstInput = fixture.querySelector("input");
+    firstInput.focus();
+
+    root.render(createElement("input", { id: "draft", value: "second" }));
+    const secondInput = fixture.querySelector("input");
+
+    assertEqual(firstInput === secondInput, false);
+    assertEqual(firstInput.isConnected, false);
+    assertEqual(secondInput.value, "second");
+    assertEqual(document.activeElement === secondInput, false);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("roots replace and unmount only their own containers", () => {
+  const firstFixture = createFixture();
+  const secondFixture = createFixture();
+  const firstRoot = createRoot(firstFixture);
+  const secondRoot = createRoot(secondFixture);
+  try {
+    firstRoot.render(createElement("p", null, "First"));
+    secondRoot.render(createElement("p", null, "Second"));
+    firstRoot.unmount();
+
+    assertEqual(firstFixture.children.length, 0);
+    assertEqual(secondFixture.textContent, "Second");
+  } finally {
+    firstRoot.unmount();
+    secondRoot.unmount();
+    firstFixture.remove();
+    secondFixture.remove();
+  }
+});
+
+test("rendering after unmount throws a focused error", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  try {
+    root.unmount();
+    root.unmount();
+
+    assertThrows(
+      () => root.render(createElement("p", null, "Too late")),
+      Error,
+      "Cannot render an unmounted root",
+    );
+  } finally {
+    fixture.remove();
+  }
+});
+
 run();
