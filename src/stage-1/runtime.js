@@ -3,15 +3,52 @@ export function createRoot(container) {
     throw new TypeError("createRoot requires an HTMLElement container");
   }
   function render(element) {
-    const node = document.createElement(element.type);
-    for (const str of element.props.children) {
-      const textNode = document.createTextNode(str);
-      node.append(textNode);
+    const node = renderDescription(element);
+    if (node === null) {
+      container.replaceChildren();
+    } else {
+      container.replaceChildren(node);
     }
-    container.replaceChildren(node);
   }
   function unmount() {
     container.replaceChildren();
   }
   return { render, unmount };
+}
+
+function renderDescription(description) {
+  if (description == null || typeof description === "boolean") {
+    return null;
+  }
+
+  if (Array.isArray(description)) {
+    const fragment = document.createDocumentFragment();
+
+    for (const childDescription of description) {
+      const childNode = renderDescription(childDescription);
+
+      if (childNode != null) {
+        fragment.append(childNode);
+      }
+    }
+
+    return fragment;
+  }
+
+  if (typeof description == "string" || typeof description == "number") {
+    return document.createTextNode(String(description));
+  }
+
+  if (typeof description == "object" && typeof description.type === "string") {
+    const node = document.createElement(description.type);
+    const children = renderDescription(description.props.children);
+
+    if (children != null) {
+      node.append(children);
+    }
+
+    return node;
+  }
+
+  throw TypeError("Unsupported child description");
 }
