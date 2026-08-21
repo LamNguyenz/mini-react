@@ -191,4 +191,34 @@ test("rejects an unsupported DOM prop", () => {
   }
 });
 
+test("invokes function components with props and normalized children", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  function Greeting({ name, children }) {
+    return createElement(
+      "section",
+      { "data-greeting": "" },
+      createElement("h2", null, `Hello ${name}`),
+      children,
+    );
+  }
+
+  try {
+    root.render(
+      createElement(
+        Greeting,
+        { name: "Ada" },
+        createElement("p", null, "Child content"),
+      ),
+    );
+
+    assertEqual(fixture.querySelector("h2").textContent, "Hello Ada");
+    assertEqual(fixture.querySelector("p").textContent, "Child content");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();

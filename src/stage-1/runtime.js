@@ -115,5 +115,13 @@ function renderDescription(description) {
     return node;
   }
 
+  if (
+    typeof description === "object" &&
+    typeof description.type === "function"
+  ) {
+    const returnedDescription = description.type(description.props);
+    return renderDescription(returnedDescription);
+  }
+
   throw TypeError("Unsupported child description");
 }
