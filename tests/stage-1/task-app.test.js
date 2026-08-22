@@ -124,4 +124,69 @@ test("blank input rerenders a visible validation error without a task", () => {
   }
 });
 
+test("toggling a task rerenders completion and the derived summary", () => {
+  const { fixture, cleanup } = mountFixture();
+  try {
+    submitTitle(fixture, "Render descriptions");
+    submitTitle(fixture, "Observe identity");
+    taskRows(fixture)[0].querySelector("[data-task-toggle]").click();
+
+    const rowsAfterRender = taskRows(fixture);
+    assertEqual(rowsAfterRender[0].dataset.completed, "true");
+    assertEqual(
+      rowsAfterRender[0].querySelector("[data-task-toggle]").checked,
+      true,
+    );
+    assertEqual(
+      fixture.querySelector("[data-task-summary]").textContent,
+      "1 of 2 completed",
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test("filters and completion derive a synchronized next description", () => {
+  const { fixture, cleanup } = mountFixture();
+  try {
+    submitTitle(fixture, "Active task");
+    submitTitle(fixture, "Completed task");
+    taskRows(fixture)[1].querySelector("[data-task-toggle]").click();
+
+    fixture.querySelector('[data-filter="active"]').click();
+    let rows = taskRows(fixture);
+    assertEqual(rows[0].hidden, false);
+    assertEqual(rows[1].hidden, true);
+    assertEqual(
+      fixture
+        .querySelector('[data-filter="active"]')
+        .getAttribute("aria-pressed"),
+      "true",
+    );
+
+    fixture.querySelector('[data-filter="completed"]').click();
+    rows = taskRows(fixture);
+    assertEqual(rows[0].hidden, true);
+    assertEqual(rows[1].hidden, false);
+    assertEqual(
+      fixture
+        .querySelector('[data-filter="completed"]')
+        .getAttribute("aria-pressed"),
+      "true",
+    );
+    assertEqual(
+      fixture.querySelector("[data-task-summary]").textContent,
+      "1 of 2 completed",
+    );
+
+    fixture.querySelector('[data-filter="all"]').click();
+    rows = taskRows(fixture);
+    assertEqual(rows[0].hidden, false);
+    assertEqual(rows[1].hidden, false);
+    assertEqual(fixture.querySelectorAll('[aria-pressed="true"]').length, 1);
+  } finally {
+    cleanup();
+  }
+});
+
 run();

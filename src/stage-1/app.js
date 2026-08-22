@@ -1,5 +1,11 @@
 import { createElement, createRoot } from "./runtime.js";
 
+const FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "completed", label: "Completed" },
+];
+
 export function mountTaskApp(container) {
   if (!(container instanceof HTMLElement)) {
     throw new TypeError("mountTaskApp requires an HTMLElement container");
@@ -16,6 +22,21 @@ export function mountTaskApp(container) {
       root.unmount();
     },
   };
+
+  function selectFilter(filter) {
+    const isValid = FILTER_OPTIONS.some((option) => option.value === filter);
+    if (!isValid) {
+      throw new Error(`Unknown filter: ${filter}`);
+    }
+    activeFilter = filter;
+    renderApp();
+  }
+
+  function toggleTask(taskId, completed) {
+    const task = tasks.find((task) => task.id === taskId);
+    task.completed = completed;
+    renderApp();
+  }
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -47,12 +68,20 @@ export function mountTaskApp(container) {
         activeFilter,
         errorMessage,
         onSubmit: handleSubmit,
+        toggleTask,
+        selectFilter,
       }),
     );
   }
 }
-
-function TaskApp({ tasks, activeFilter, errorMessage, onSubmit }) {
+function TaskApp({
+  tasks,
+  activeFilter,
+  errorMessage,
+  onSubmit,
+  toggleTask,
+  selectFilter,
+}) {
   const input = createElement("input", {
     "data-task-input": "",
   });
@@ -83,18 +112,14 @@ function TaskApp({ tasks, activeFilter, errorMessage, onSubmit }) {
     errorMessage,
   );
 
-  const filterOptions = [
-    { value: "all", label: "All" },
-    { value: "active", label: "Active" },
-    { value: "completed", label: "Completed" },
-  ];
-  const filterButtons = filterOptions.map((option) =>
+  const filterButtons = FILTER_OPTIONS.map((option) =>
     createElement(
       "button",
       {
         type: "button",
         "data-filter": option.value,
         "aria-pressed": String(option.value === activeFilter),
+        onClick: () => selectFilter(option.value),
       },
       option.label,
     ),
@@ -117,7 +142,9 @@ function TaskApp({ tasks, activeFilter, errorMessage, onSubmit }) {
     summaryContent,
   );
 
-  const taskRows = tasks.map((task) => createElement(TaskRow, { task }));
+  const taskRows = tasks.map((task) =>
+    createElement(TaskRow, { task, toggleTask, activeFilter }),
+  );
   const list = createElement(
     "ul",
     {
@@ -129,13 +156,14 @@ function TaskApp({ tasks, activeFilter, errorMessage, onSubmit }) {
   return createElement("div", null, form, error, filters, summary, list);
 }
 
-function TaskRow({ task }) {
+function TaskRow({ task, toggleTask, activeFilter }) {
   const inputId = `task-${task.id}`;
   const checkbox = createElement("input", {
     type: "checkbox",
     id: inputId,
     "data-task-toggle": "",
     checked: task.completed,
+    onChange: (event) => toggleTask(task.id, event.currentTarget.checked),
   });
   const titleNode = createElement(
     "label",
@@ -146,12 +174,19 @@ function TaskRow({ task }) {
     checkbox,
     task.title,
   );
+
+  const matchesFilter =
+    activeFilter === "all" ||
+    (activeFilter === "active" && !task.completed) ||
+    (activeFilter === "completed" && task.completed);
+
   const row = createElement(
     "li",
     {
       "data-task-row": "",
       "data-task-id": String(task.id),
       "data-completed": String(task.completed),
+      hidden: !matchesFilter
     },
     titleNode,
   );
