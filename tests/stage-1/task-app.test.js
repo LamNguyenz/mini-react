@@ -189,4 +189,23 @@ test("filters and completion derive a synchronized next description", () => {
   }
 });
 
+test("a declarative rerender replaces DOM identity and loses draft focus", () => {
+  const { fixture, cleanup } = mountFixture();
+  try {
+    const firstInput = fixture.querySelector("[data-task-input]");
+    firstInput.value = "Uncommitted draft";
+    firstInput.focus();
+
+    fixture.querySelector('[data-filter="active"]').click();
+    const nextInput = fixture.querySelector("[data-task-input]");
+
+    assertEqual(firstInput === nextInput, false);
+    assertEqual(firstInput.isConnected, false);
+    assertEqual(nextInput.value, "");
+    assertEqual(document.activeElement === nextInput, false);
+  } finally {
+    cleanup();
+  }
+});
+
 run();
