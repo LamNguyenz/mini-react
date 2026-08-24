@@ -1,0 +1,11 @@
+{
+  "name": "mini-react-workshop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "inspect:stage1-jsx": "esbuild examples/stage-1/jsx-example.jsx --jsx=transform --jsx-factory=createElement --format=esm --log-level=warning"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
