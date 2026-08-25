@@ -221,21 +221,41 @@ test("invokes function components with props and normalized children", () => {
   }
 });
 
-test("a second render replaces the previous DOM identity", () => {
+test("a second render preserves same-type host identity and browser state", () => {
   const fixture = createFixture();
   const root = createRoot(fixture);
   try {
-    root.render(createElement("input", { id: "draft", value: "first" }));
+    root.render(createElement("input", { id: "draft" }));
     const firstInput = fixture.querySelector("input");
+    firstInput.value = "Uncommitted draft";
     firstInput.focus();
 
-    root.render(createElement("input", { id: "draft", value: "second" }));
-    const secondInput = fixture.querySelector("input");
+    root.render(createElement("input", { id: "draft" }));
+    const nextInput = fixture.querySelector("input");
 
-    assertEqual(firstInput === secondInput, false);
-    assertEqual(firstInput.isConnected, false);
-    assertEqual(secondInput.value, "second");
-    assertEqual(document.activeElement === secondInput, false);
+    assertEqual(firstInput === nextInput, true);
+    assertEqual(firstInput.isConnected, true);
+    assertEqual(nextInput.value, "Uncommitted draft");
+    assertEqual(document.activeElement === nextInput, true);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("updates text while preserving the host and text node objects", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  try {
+    root.render(createElement("p", null, "Before"));
+    const paragraph = fixture.querySelector("p");
+    const textNode = paragraph.firstChild;
+
+    root.render(createElement("p", null, "After"));
+
+    assertEqual(fixture.querySelector("p") === paragraph, true);
+    assertEqual(paragraph.firstChild === textNode, true);
+    assertEqual(textNode.nodeValue, "After");
   } finally {
     root.unmount();
     fixture.remove();

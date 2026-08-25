@@ -20,27 +20,41 @@ export function createElement(type, props, ...children) {
 }
 
 export function createRoot(container) {
-  let isUnmount = false
+  let isUnmount = false;
+  let childRecords = [];
 
   if (!(container instanceof HTMLElement)) {
     throw new TypeError("createRoot requires an HTMLElement container");
   }
   function render(element) {
     if (isUnmount) {
-      throw Error("Cannot render an unmounted root")
+      throw Error("Cannot render an unmounted root");
     }
-    const node = renderDescription(element);
-    if (node === null) {
-      container.replaceChildren();
-    } else {
-      container.replaceChildren(node);
+
+    const oldRecord = childRecords[0];
+    if (
+      oldRecord &&
+      typeof element?.type === "string" &&
+      oldRecord.type === element.type
+    ) {
+      childRecords[0] = reconcileRecord(oldRecord, element);
+      return;
     }
+
+    const nextRecords = mountRecords(element);
+
+    container.replaceChildren(...nextRecords.map((record) => record.dom));
+    childRecords = nextRecords;
   }
+
   function unmount() {
     if (isUnmount) return;
+
     isUnmount = true;
     container.replaceChildren();
+    childRecords = [];
   }
+
   return { render, unmount };
 }
 
@@ -83,51 +97,78 @@ function applyProp(node, name, value) {
   throw TypeError(`Unsupported prop: ${name}`);
 }
 
-function renderDescription(description) {
+function reconcileRecord(oldRecord, description) {
+  if (oldRecord.kind === "text") {
+    const nextValue = String(description);
+
+    if (oldRecord.value !== nextValue) {
+      oldRecord.dom.nodeValue = nextValue;
+      oldRecord.value = nextValue;
+    }
+    return oldRecord;
+  }
+
+  if (oldRecord.kind === "host") {
+    const nextDescriptions = description.props.children;
+
+    oldRecord.children = oldRecord.children.map((childRecord, index) =>
+      reconcileRecord(childRecord, nextDescriptions[index]),
+    );
+    oldRecord.props = description.props;
+    return oldRecord;
+  }
+}
+
+function mountRecords(description) {
   if (description == null || typeof description === "boolean") {
-    return null;
+    return [];
   }
 
   if (Array.isArray(description)) {
-    const fragment = document.createDocumentFragment();
-
-    for (const childDescription of description) {
-      const childNode = renderDescription(childDescription);
-
-      if (childNode != null) {
-        fragment.append(childNode);
-      }
-    }
-
-    return fragment;
+    return description.flatMap(mountRecords);
   }
 
   if (typeof description == "string" || typeof description == "number") {
-    return document.createTextNode(String(description));
+    const value = String(description);
+    const dom = document.createTextNode(value);
+
+    return [
+      {
+        kind: "text",
+        value,
+        dom,
+      },
+    ];
   }
 
   if (typeof description == "object" && typeof description.type === "string") {
-    const node = document.createElement(description.type);
+    const dom = document.createElement(description.type);
 
     for (const [name, value] of Object.entries(description.props)) {
-      applyProp(node, name, value);
+      applyProp(dom, name, value);
     }
 
-    const children = renderDescription(description.props.children);
+    const children = mountRecords(description.props.children);
 
-    if (children != null) {
-      node.append(children);
-    }
+    dom.append(...children.map((child) => child.dom));
 
-    return node;
+    return [
+      {
+        kind: "host",
+        type: description.type,
+        props: description.props,
+        dom,
+        children,
+      },
+    ];
   }
 
   if (
     typeof description === "object" &&
     typeof description.type === "function"
   ) {
-    const returnedDescription = description.type(description.props);
-    return renderDescription(returnedDescription);
+    const output = description.type(description.props);
+    return mountRecords(output);
   }
 
   throw TypeError("Unsupported child description");
