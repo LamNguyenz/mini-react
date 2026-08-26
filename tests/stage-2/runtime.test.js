@@ -262,6 +262,81 @@ test("updates text while preserving the host and text node objects", () => {
   }
 });
 
+test("updates and removes supported props on a reused host node", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  try {
+    root.render(
+      createElement("input", {
+        id: "before",
+        checked: true,
+        hidden: true,
+        "data-state": "before",
+        "aria-label": "Before",
+      }),
+    );
+    const input = fixture.querySelector("input");
+
+    root.render(createElement("input", { id: "after", checked: false }));
+
+    assertEqual(fixture.querySelector("input") === input, true);
+    assertEqual(input.id, "after");
+    assertEqual(input.checked, false);
+    assertEqual(input.hidden, false);
+    assertEqual(input.hasAttribute("data-state"), false);
+    assertEqual(input.hasAttribute("aria-label"), false);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("replaces and removes event handlers without duplicate listeners", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let firstClicks = 0;
+  let nextClicks = 0;
+  const firstHandler = () => {
+    firstClicks += 1;
+  };
+  const nextHandler = () => {
+    nextClicks += 1;
+  };
+
+  try {
+    root.render(createElement("button", { onClick: firstHandler }, "Run"));
+    const button = fixture.querySelector("button");
+    button.click();
+
+    root.render(createElement("button", { onClick: nextHandler }, "Run"));
+    button.click();
+
+    root.render(createElement("button", null, "Run"));
+    button.click();
+
+    assertEqual(firstClicks, 1);
+    assertEqual(nextClicks, 1);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects a non-function event prop", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  try {
+    assertThrows(
+      () => root.render(createElement("button", { onClick: "invalid" })),
+      TypeError,
+      "Event prop onClick requires a function",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 test("roots replace and unmount only their own containers", () => {
   const firstFixture = createFixture();
   const secondFixture = createFixture();

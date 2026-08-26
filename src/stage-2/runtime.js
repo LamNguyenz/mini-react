@@ -58,23 +58,28 @@ export function createRoot(container) {
   return { render, unmount };
 }
 
-function applyProp(node, name, value) {
+const DIRECT_PROPERTIES = new Set([
+  "value",
+  "checked",
+  "hidden",
+  "type",
+  "id",
+  "className",
+  "htmlFor",
+]);
+const EVENT_NAMES = {
+  onClick: "click",
+  onSubmit: "submit",
+  onChange: "change",
+};
+
+function setProp(node, name, value) {
   if (name === "children") {
     return;
   }
 
-  const directProperties = [
-    "value",
-    "checked",
-    "hidden",
-    "type",
-    "id",
-    "className",
-    "htmlFor",
-  ];
-
-  if (directProperties.includes(name)) {
-    node[name] = value;
+  if (DIRECT_PROPERTIES.has(name)) {
+    node[name] = value
     return;
   }
 
@@ -83,18 +88,59 @@ function applyProp(node, name, value) {
     return;
   }
 
-  const eventNames = {
-    onClick: "click",
-    onSubmit: "submit",
-    onChange: "change",
-  };
-
-  if (name in eventNames) {
-    node.addEventListener(eventNames[name], value);
+  if (name in EVENT_NAMES) {
+    if (typeof value !== "function") {
+      throw TypeError(`Event prop ${name} requires a function`);
+    }
+    node.addEventListener(EVENT_NAMES[name], value);
     return;
   }
 
   throw TypeError(`Unsupported prop: ${name}`);
+}
+
+function removeProp(node, name, value) {
+  if (name === "children") return;
+
+  if (DIRECT_PROPERTIES.has(name)) {
+    node[name] = typeof node[name] === "boolean" ? false : "";
+    return;
+  }
+
+  if (name.startsWith("data-") || name.startsWith("aria-")) {
+    node.removeAttribute(name);
+    return;
+  }
+
+  if (name in EVENT_NAMES) {
+    node.removeEventListener(EVENT_NAMES[name], value);
+    return;
+  }
+
+  throw TypeError(`Unsupported prop: ${name}`);
+}
+
+function updateProps(node, oldProps, nextProps) {
+  for (const [name, oldValue] of Object.entries(oldProps)) {
+    if (name === "children") continue;
+
+    if (!(name in nextProps)) {
+      removeProp(node, name, oldValue);
+    }
+  }
+
+  for (const [name, newValue] of Object.entries(nextProps)) {
+    if (name === "children") continue;
+
+    const oldValue = oldProps[name];
+    if (oldValue === newValue) continue;
+
+    if (name in EVENT_NAMES && name in oldProps) {
+      removeProp(node, name, oldProps[name]);
+    }
+
+    setProp(node, name, nextProps[name]);
+  }
 }
 
 function reconcileRecord(oldRecord, description) {
@@ -109,6 +155,7 @@ function reconcileRecord(oldRecord, description) {
   }
 
   if (oldRecord.kind === "host") {
+    updateProps(oldRecord.dom, oldRecord.props, description.props);
     const nextDescriptions = description.props.children;
 
     oldRecord.children = oldRecord.children.map((childRecord, index) =>
@@ -145,7 +192,7 @@ function mountRecords(description) {
     const dom = document.createElement(description.type);
 
     for (const [name, value] of Object.entries(description.props)) {
-      applyProp(dom, name, value);
+      setProp(dom, name, value);
     }
 
     const children = mountRecords(description.props.children);
