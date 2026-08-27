@@ -37,7 +37,7 @@ export function createRoot(container) {
       typeof element?.type === "string" &&
       oldRecord.type === element.type
     ) {
-      childRecords[0] = reconcileRecord(oldRecord, element);
+      childRecords[0] = reconcileRecord(container, oldRecord, element);
       return;
     }
 
@@ -79,7 +79,7 @@ function setProp(node, name, value) {
   }
 
   if (DIRECT_PROPERTIES.has(name)) {
-    node[name] = value
+    node[name] = value;
     return;
   }
 
@@ -143,7 +143,56 @@ function updateProps(node, oldProps, nextProps) {
   }
 }
 
-function reconcileRecord(oldRecord, description) {
+function hasSameType(oldRecord, description) {
+  if (oldRecord.kind === "text") {
+    return typeof description === "string" || typeof description === "number";
+  }
+
+  return (
+    oldRecord.kind === "host" &&
+    typeof description === "object" &&
+    typeof description.type === "string" &&
+    oldRecord.type === description.type
+  );
+}
+
+function reconcileChildren(parent, oldRecords, nextDescriptions) {
+  const nextRecords = [];
+
+  for (let i = 0; i < nextDescriptions.length; i++) {
+    const oldRecord = oldRecords[i];
+    const nextDescription = nextDescriptions[i];
+
+    if (oldRecord === undefined) {
+      const [nextRecord] = mountRecords(nextDescription);
+      const anchor = parent.childNodes[i] ?? null;
+
+      parent.insertBefore(nextRecord.dom, anchor);
+      nextRecords.push(nextRecord);
+      continue;
+    }
+
+    nextRecords.push(reconcileRecord(parent, oldRecord, nextDescription));
+  }
+
+  for (
+    let index = nextDescriptions.length;
+    index < oldRecords.length;
+    index++
+  ) {
+    oldRecords[index].dom.remove();
+  }
+
+  return nextRecords;
+}
+
+function reconcileRecord(parent, oldRecord, description) {
+  if (!hasSameType(oldRecord, description)) {
+    const [nextRecord] = mountRecords(description);
+    parent.replaceChild(nextRecord.dom, oldRecord.dom);
+    return nextRecord;
+  }
+
   if (oldRecord.kind === "text") {
     const nextValue = String(description);
 
@@ -158,8 +207,10 @@ function reconcileRecord(oldRecord, description) {
     updateProps(oldRecord.dom, oldRecord.props, description.props);
     const nextDescriptions = description.props.children;
 
-    oldRecord.children = oldRecord.children.map((childRecord, index) =>
-      reconcileRecord(childRecord, nextDescriptions[index]),
+    oldRecord.children = reconcileChildren(
+      oldRecord.dom,
+      oldRecord.children,
+      nextDescriptions,
     );
     oldRecord.props = description.props;
     return oldRecord;

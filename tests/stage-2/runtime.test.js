@@ -337,6 +337,55 @@ test("rejects a non-function event prop", () => {
   }
 });
 
+test("inserts, replaces, and deletes positional children", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  try {
+    root.render(
+      createElement(
+        "section",
+        null,
+        createElement("p", { "data-id": "a" }, "A"),
+        createElement("p", { "data-id": "b" }, "B"),
+      ),
+    );
+    const section = fixture.querySelector("section");
+    const firstParagraph = section.children[0];
+    const removedParagraph = section.children[1];
+
+    root.render(
+      createElement(
+        "section",
+        null,
+        createElement("p", { "data-id": "a" }, "A updated"),
+        createElement("span", { "data-id": "c" }, "C"),
+        createElement("p", { "data-id": "d" }, "D"),
+      ),
+    );
+
+    assertEqual(section.children[0] === firstParagraph, true);
+    assertEqual(section.children[0].textContent, "A updated");
+    assertEqual(section.children[1].tagName, "SPAN");
+    assertEqual(section.children[2].textContent, "D");
+    assertEqual(removedParagraph.isConnected, false);
+
+    const lastParagraph = section.children[2];
+    root.render(
+      createElement(
+        "section",
+        null,
+        createElement("p", { "data-id": "a" }, "A updated"),
+      ),
+    );
+
+    assertEqual(section.children.length, 1);
+    assertEqual(lastParagraph.isConnected, false);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 test("roots replace and unmount only their own containers", () => {
   const firstFixture = createFixture();
   const secondFixture = createFixture();
