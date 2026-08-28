@@ -26,25 +26,14 @@ export function createRoot(container) {
   if (!(container instanceof HTMLElement)) {
     throw new TypeError("createRoot requires an HTMLElement container");
   }
+
   function render(element) {
     if (isUnmount) {
       throw Error("Cannot render an unmounted root");
     }
 
-    const oldRecord = childRecords[0];
-    if (
-      oldRecord &&
-      typeof element?.type === "string" &&
-      oldRecord.type === element.type
-    ) {
-      childRecords[0] = reconcileRecord(container, oldRecord, element);
-      return;
-    }
-
-    const nextRecords = mountRecords(element);
-
-    container.replaceChildren(...nextRecords.map((record) => record.dom));
-    childRecords = nextRecords;
+    const nextDescriptions = expandDescriptions(element);
+    childRecords = reconcileChildren(container, childRecords, nextDescriptions);
   }
 
   function unmount() {
@@ -205,7 +194,7 @@ function reconcileRecord(parent, oldRecord, description) {
 
   if (oldRecord.kind === "host") {
     updateProps(oldRecord.dom, oldRecord.props, description.props);
-    const nextDescriptions = description.props.children;
+    const nextDescriptions = expandDescriptions(description.props.children);
 
     oldRecord.children = reconcileChildren(
       oldRecord.dom,
@@ -270,4 +259,24 @@ function mountRecords(description) {
   }
 
   throw TypeError("Unsupported child description");
+}
+
+function expandDescriptions(description) {
+  if (description == null || typeof description === "boolean") {
+    return [];
+  }
+
+  if (Array.isArray(description)) {
+    return description.flatMap(expandDescriptions);
+  }
+
+  if (
+    typeof description === "object" &&
+    typeof description.type === "function"
+  ) {
+    const output = description.type(description.props);
+    return expandDescriptions(output);
+  }
+
+  return [description];
 }
