@@ -423,4 +423,53 @@ test("rendering after unmount throws a focused error", () => {
   }
 });
 
+test("positional matching reuses the wrong logical row after a front insertion", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  function TaskRow({ id, title }) {
+    return createElement("li", { "data-task-id": id }, title);
+  }
+
+  function TaskList({ tasks }) {
+    return createElement(
+      "ul",
+      null,
+      tasks.map((task) => createElement(TaskRow, task)),
+    );
+  }
+
+  try {
+    root.render(
+      createElement(TaskList, {
+        tasks: [
+          { id: "a", title: "Task A" },
+          { id: "b", title: "Task B" },
+        ],
+      }),
+    );
+
+    const formerTaskARow = fixture.querySelector('[data-task-id="a"]');
+    formerTaskARow.browserOwnedDraft = "belongs to task A";
+
+    root.render(
+      createElement(TaskList, {
+        tasks: [
+          { id: "x", title: "Task X" },
+          { id: "a", title: "Task A" },
+          { id: "b", title: "Task B" },
+        ],
+      }),
+    );
+
+    const firstRow = fixture.querySelector("li");
+    assertEqual(firstRow === formerTaskARow, true);
+    assertEqual(firstRow.dataset.taskId, "x");
+    assertEqual(firstRow.browserOwnedDraft, "belongs to task A");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();
