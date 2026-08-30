@@ -144,7 +144,7 @@ function TaskApp({
   );
 
   const taskRows = tasks.map((task) =>
-    createElement(TaskRow, { task, toggleTask, activeFilter }),
+    createElement(TaskRow, { key: task.id, task, toggleTask, activeFilter }),
   );
   const list = createElement(
     "ul",
@@ -187,7 +187,7 @@ function TaskRow({ task, toggleTask, activeFilter }) {
       "data-task-row": "",
       "data-task-id": String(task.id),
       "data-completed": String(task.completed),
-      hidden: !matchesFilter
+      hidden: !matchesFilter,
     },
     titleNode,
   );

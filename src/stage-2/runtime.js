@@ -9,9 +9,10 @@ export function createElement(type, props, ...children) {
   if (!(typeof type == "string" || typeof type == "function")) {
     throw new TypeError("createElement requires a string or function type");
   }
-  const copiedProps = { ...props };
+  const { key = null, ...copiedProps } = props ?? {};
   return {
     type,
+    key,
     props: {
       ...copiedProps,
       children: normalizeChildren(children),
@@ -146,30 +147,47 @@ function hasSameType(oldRecord, description) {
 }
 
 function reconcileChildren(parent, oldRecords, nextDescriptions) {
-  const nextRecords = [];
+  const oldKeys = new Map();
+  const oldUnkeyedByIndex = new Map();
 
-  for (let i = 0; i < nextDescriptions.length; i++) {
-    const oldRecord = oldRecords[i];
-    const nextDescription = nextDescriptions[i];
-
-    if (oldRecord === undefined) {
-      const [nextRecord] = mountRecords(nextDescription);
-      const anchor = parent.childNodes[i] ?? null;
-
-      parent.insertBefore(nextRecord.dom, anchor);
-      nextRecords.push(nextRecord);
-      continue;
+  for (const [index, record] of oldRecords.entries()) {
+    if (record.key == null) {
+      oldUnkeyedByIndex.set(index, record);
+    } else {
+      oldKeys.set(record.key, record);
     }
-
-    nextRecords.push(reconcileRecord(parent, oldRecord, nextDescription));
   }
 
-  for (
-    let index = nextDescriptions.length;
-    index < oldRecords.length;
-    index++
-  ) {
-    oldRecords[index].dom.remove();
+  const nextRecords = [];
+  const usedRecords = new Set();
+  for (let i = 0; i < nextDescriptions.length; i++) {
+    const nextDescription = nextDescriptions[i];
+
+    const oldRecord =
+      nextDescription.key == null
+        ? (oldUnkeyedByIndex.get(i) ?? null)
+        : (oldKeys.get(nextDescription.key) ?? null);
+
+    let nextRecord;
+    if (oldRecord == null) {
+      [nextRecord] = mountRecords(nextDescription);
+    } else {
+      usedRecords.add(oldRecord);
+      nextRecord = reconcileRecord(parent, oldRecord, nextDescription);
+    }
+
+    const anchor = parent.childNodes[i] ?? null;
+
+    if (nextRecord.dom !== anchor) {
+      parent.insertBefore(nextRecord.dom, anchor);
+    }
+    nextRecords.push(nextRecord);
+  }
+
+  for (const oldRecord of oldRecords) {
+    if (!usedRecords.has(oldRecord) && oldRecord.dom.parentNode === parent) {
+      oldRecord.dom.remove();
+    }
   }
 
   return nextRecords;
@@ -235,7 +253,9 @@ function mountRecords(description) {
       setProp(dom, name, value);
     }
 
-    const children = mountRecords(description.props.children);
+    const childDescriptions = expandDescriptions(description.props.children);
+
+    const children = childDescriptions.flatMap(mountRecords);
 
     dom.append(...children.map((child) => child.dom));
 
@@ -243,6 +263,7 @@ function mountRecords(description) {
       {
         kind: "host",
         type: description.type,
+        key: description.key ?? null,
         props: description.props,
         dom,
         children,
@@ -275,7 +296,28 @@ function expandDescriptions(description) {
     typeof description.type === "function"
   ) {
     const output = description.type(description.props);
-    return expandDescriptions(output);
+
+    const outputDescriptions = expandDescriptions(output);
+
+    if (description.key != null && outputDescriptions.length !== 1) {
+      throw new TypeError(
+        "A keyed function component must return exactly one host root",
+      );
+    }
+
+    if (
+      outputDescriptions.length === 1 &&
+      typeof outputDescriptions[0]?.type === "string"
+    ) {
+      const [outputDescription] = outputDescriptions;
+      return [
+        {
+          ...outputDescription,
+          key: description.key,
+        },
+      ];
+    }
+    return outputDescriptions;
   }
 
   return [description];

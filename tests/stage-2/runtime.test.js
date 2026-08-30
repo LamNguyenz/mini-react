@@ -472,4 +472,128 @@ test("positional matching reuses the wrong logical row after a front insertion",
   }
 });
 
+test("createElement reserves key outside props and the DOM", () => {
+  const element = createElement("li", { key: "task-1", "data-id": "1" });
+  assertEqual(element.key, "task-1");
+  assertEqual("key" in element.props, false);
+
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  try {
+    root.render(element);
+    assertEqual(fixture.querySelector("li").hasAttribute("key"), false);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("stable keys preserve function-component row identity at front insertion", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  function Row({ id }) {
+    return createElement("li", { "data-id": id }, id);
+  }
+
+  const list = (ids) =>
+    createElement(
+      "ul",
+      null,
+      ids.map((id) => createElement(Row, { key: id, id })),
+    );
+
+  try {
+    root.render(list(["a", "b"]));
+    const rowA = fixture.querySelector('[data-id="a"]');
+    const rowB = fixture.querySelector('[data-id="b"]');
+
+    root.render(list(["x", "a", "b"]));
+    const rows = [...fixture.querySelectorAll("li")];
+
+    assertEqual(rows[0].dataset.id, "x");
+    assertEqual(rows[1] === rowA, true);
+    assertEqual(rows[2] === rowB, true);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("stable keys move existing host nodes into the next sibling order", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  const list = (ids) =>
+    createElement(
+      "ul",
+      null,
+      ids.map((id) =>
+        createElement("li", { key: id, "data-id": id }, id),
+      ),
+    );
+
+  try {
+    root.render(list(["a", "b"]));
+    const rowA = fixture.querySelector('[data-id="a"]');
+    const rowB = fixture.querySelector('[data-id="b"]');
+
+    root.render(list(["b", "a"]));
+    const rows = [...fixture.querySelectorAll("li")];
+
+    assertEqual(rows[0] === rowB, true);
+    assertEqual(rows[1] === rowA, true);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("unkeyed children match by absolute index among keyed siblings", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  function row(id, key = null) {
+    return createElement("li", { key, "data-id": id }, id);
+  }
+
+  try {
+    root.render(
+      createElement(
+        "ul",
+        null,
+        row("a", "a"),
+        row("b", "b"),
+        row("tail"),
+      ),
+    );
+
+    const rowA = fixture.querySelector('[data-id="a"]');
+    const rowB = fixture.querySelector('[data-id="b"]');
+    const oldTail = fixture.querySelector('[data-id="tail"]');
+
+    root.render(
+      createElement(
+        "ul",
+        null,
+        row("x"),
+        row("a", "a"),
+        row("b", "b"),
+        row("tail"),
+      ),
+    );
+
+    const rows = [...fixture.querySelectorAll("li")];
+    assertEqual(rows[0].dataset.id, "x");
+    assertEqual(rows[0] === oldTail, false);
+    assertEqual(rows[1] === rowA, true);
+    assertEqual(rows[2] === rowB, true);
+    assertEqual(rows[3] === oldTail, false);
+    assertEqual(oldTail.isConnected, false);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();
