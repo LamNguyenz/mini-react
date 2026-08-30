@@ -596,4 +596,69 @@ test("unkeyed children match by absolute index among keyed siblings", () => {
   }
 });
 
+test("key plus type determines identity during list reconciliation", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  const row = (type, key, label) =>
+    createElement(type, { key, "data-key": key }, label);
+
+  try {
+    root.render(
+      createElement(
+        "div",
+        null,
+        row("p", "a", "A"),
+        row("p", "b", "B"),
+        row("p", "c", "C"),
+      ),
+    );
+    const itemA = fixture.querySelector('[data-key="a"]');
+    const itemB = fixture.querySelector('[data-key="b"]');
+    const itemC = fixture.querySelector('[data-key="c"]');
+
+    root.render(
+      createElement(
+        "div",
+        null,
+        row("p", "c", "C"),
+        row("span", "a", "A changed type"),
+      ),
+    );
+
+    const children = [...fixture.querySelector("div").children];
+    assertEqual(children[0] === itemC, true);
+    assertEqual(children[1].tagName, "SPAN");
+    assertEqual(children[1] === itemA, false);
+    assertEqual(itemA.isConnected, false);
+    assertEqual(itemB.isConnected, false);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects a keyed function component with multiple host roots", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  function Pair() {
+    return [
+      createElement("span", null, "First"),
+      createElement("span", null, "Second"),
+    ];
+  }
+
+  try {
+    assertThrows(
+      () => root.render(createElement(Pair, { key: "pair" })),
+      TypeError,
+      "A keyed function component must return exactly one host root",
+    );
+    assertEqual(fixture.children.length, 0);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();

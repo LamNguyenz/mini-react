@@ -946,92 +946,76 @@ return {
 
 Update the existing `createElement` output test to assert `element.key === null` for an unkeyed description.
 
-- [ ] **Step 4: Carry a function component's key to its single resolved output**
+- [ ] **Step 4: Carry a function component call-site key to its single host output**
 
-Change resolution to accept an inherited key:
+Expand the component first, then apply the component call site's key to its
+single host output:
 
 ```js
-function resolveDescriptions(description, inheritedKey = null) {
-  if (description == null || typeof description === "boolean") return [];
+if (
+  typeof description === "object" &&
+  typeof description.type === "function"
+) {
+  const output = description.type(description.props);
+  const outputDescriptions = expandDescriptions(output);
 
-  if (Array.isArray(description)) {
-    const resolved = description.flatMap((child) =>
-      resolveDescriptions(child),
+  if (description.key != null && outputDescriptions.length !== 1) {
+    throw new TypeError(
+      "A keyed function component must return exactly one host root",
     );
-    if (inheritedKey != null) {
-      if (resolved.length !== 1) {
-        throw new TypeError(
-          "A keyed function component must return exactly one host or text root",
-        );
-      }
-      return [{ ...resolved[0], key: inheritedKey }];
-    }
-    return resolved;
   }
 
-  if (typeof description === "string" || typeof description === "number") {
-    return [{ kind: "text", key: inheritedKey, value: String(description) }];
+  if (
+    outputDescriptions.length === 1 &&
+    typeof outputDescriptions[0]?.type === "string"
+  ) {
+    const [outputDescription] = outputDescriptions;
+    return [{ ...outputDescription, key: description.key }];
   }
 
-  if (typeof description === "object" && typeof description.type === "function") {
-    const componentKey = description.key ?? inheritedKey;
-    const resolved = resolveDescriptions(
-      description.type(description.props),
-      componentKey,
-    );
-    if (componentKey != null && resolved.length !== 1) {
-      throw new TypeError(
-        "A keyed function component must return exactly one host or text root",
-      );
-    }
-    return resolved;
-  }
-
-  if (typeof description === "object" && typeof description.type === "string") {
-    return [{
-      kind: "host",
-      key: inheritedKey ?? description.key ?? null,
-      type: description.type,
-      props: description.props,
-    }];
-  }
-
-  throw new TypeError("Unsupported child description");
+  return outputDescriptions;
 }
 ```
+
+The explicit overwrite with `description.key`, including `null`, preserves key
+scope: a key inside a component's returned host element does not become that
+component's key among its parent's siblings.
 
 - [ ] **Step 5: Match keys before reconciling and place records by anchor**
 
 Replace positional `reconcileChildren` with:
 
 ```js
-function reconcileChildren(parent, oldRecords, nextSpecs) {
+function reconcileChildren(parent, oldRecords, nextDescriptions) {
   const oldKeyed = new Map();
-  const oldUnkeyed = [];
+  const oldUnkeyedByIndex = new Map();
 
-  for (const record of oldRecords) {
-    if (record.key == null) oldUnkeyed.push(record);
-    else oldKeyed.set(record.key, record);
+  for (const [index, record] of oldRecords.entries()) {
+    if (record.key == null) {
+      oldUnkeyedByIndex.set(index, record);
+    } else {
+      oldKeyed.set(record.key, record);
+    }
   }
 
   const usedRecords = new Set();
   const nextRecords = [];
-  let unkeyedIndex = 0;
 
-  for (const spec of nextSpecs) {
-    const oldRecord = spec.key == null
-      ? oldUnkeyed[unkeyedIndex++] ?? null
-      : oldKeyed.get(spec.key) ?? null;
+  for (let index = 0; index < nextDescriptions.length; index++) {
+    const nextDescription = nextDescriptions[index];
+    const oldRecord = nextDescription.key == null
+      ? oldUnkeyedByIndex.get(index) ?? null
+      : oldKeyed.get(nextDescription.key) ?? null;
 
     let nextRecord;
     if (oldRecord === null) {
-      nextRecord = mountRecord(spec);
+      [nextRecord] = mountRecords(nextDescription);
     } else {
       usedRecords.add(oldRecord);
-      nextRecord = reconcileRecord(parent, oldRecord, spec);
+      nextRecord = reconcileRecord(parent, oldRecord, nextDescription);
     }
 
-    const anchor = parent.childNodes[nextRecords.length] ?? null;
+    const anchor = parent.childNodes[index] ?? null;
     if (nextRecord.dom !== anchor) {
       parent.insertBefore(nextRecord.dom, anchor);
     }
@@ -1049,6 +1033,8 @@ function reconcileChildren(parent, oldRecords, nextSpecs) {
 ```
 
 This still performs all comparison and DOM mutation synchronously. The map is only a sibling identity lookup, not Fiber or a separate planning phase.
+Unkeyed children use their absolute sibling index as implicit identity; they are
+not matched by their order among only the unkeyed children.
 
 - [ ] **Step 6: Give task rows stable logical keys**
 
@@ -1069,7 +1055,7 @@ const taskRows = tasks.map((task) =>
 
 Expected:
 
-- Stage 2 runtime: `20/20 tests passed`.
+- Stage 2 runtime: `22/22 tests passed`.
 - Stage 2 task app: `8/8 tests passed`.
 - The earlier unkeyed observation still passes because its rows intentionally omit keys.
 
@@ -1080,22 +1066,27 @@ git commit -m "feat(stage-2): reconcile children by stable key"
 
 ---
 
-### Task 8: Prove Keyed Movement, Deletion, Replacement, and Diagnostics
+### Task 8: Prove Keyed Movement, Deletion, Replacement, and Root Boundaries
 
 **Files:**
 - Modify: `tests/stage-2/runtime.test.js`
-- Modify: `src/stage-2/runtime.js`
 
 **Interfaces:**
 - Consumes: keyed sibling matching from Task 7.
-- Produces: verified keyed movement/deletion/type replacement and a duplicate-sibling-key error before DOM mutation.
+- Produces: verified keyed movement/deletion/type replacement and a focused
+  boundary for keyed function components that return multiple host roots.
 
-- [ ] **Step 1: Add keyed movement, deletion, and type replacement tests**
+React reports duplicate sibling keys with a development-only warning and keeps
+reconciling; it does not throw. Stage 2 has no development/production diagnostic
+layer, so duplicate-key warnings are deferred and duplicate-key behavior remains
+unsupported.
+
+- [ ] **Step 1: Add keyed movement, deletion, and type replacement coverage**
 
 Append:
 
 ```js
-test("keyed children move, delete, and replace by key plus type", () => {
+test("key plus type determines identity during list reconciliation", () => {
   const fixture = createFixture();
   const root = createRoot(fixture);
   const row = (type, key, label) =>
@@ -1137,40 +1128,11 @@ test("keyed children move, delete, and replace by key plus type", () => {
 });
 ```
 
-- [ ] **Step 2: Add the duplicate-key test**
+- [ ] **Step 2: Add the keyed multi-root boundary test**
 
 Append:
 
 ```js
-test("rejects duplicate sibling keys before changing the DOM", () => {
-  const fixture = createFixture();
-  const root = createRoot(fixture);
-  try {
-    root.render(createElement("ul", null, createElement("li", null, "Safe")));
-    const originalList = fixture.querySelector("ul");
-
-    assertThrows(
-      () =>
-        root.render(
-          createElement(
-            "ul",
-            null,
-            createElement("li", { key: "same" }, "First"),
-            createElement("li", { key: "same" }, "Second"),
-          ),
-        ),
-      TypeError,
-      "Duplicate key among siblings: same",
-    );
-
-    assertEqual(fixture.querySelector("ul") === originalList, true);
-    assertEqual(originalList.textContent, "Safe");
-  } finally {
-    root.unmount();
-    fixture.remove();
-  }
-});
-
 test("rejects a keyed function component with multiple host roots", () => {
   const fixture = createFixture();
   const root = createRoot(fixture);
@@ -1186,7 +1148,7 @@ test("rejects a keyed function component with multiple host roots", () => {
     assertThrows(
       () => root.render(createElement(Pair, { key: "pair" })),
       TypeError,
-      "A keyed function component must return exactly one host or text root",
+      "A keyed function component must return exactly one host root",
     );
     assertEqual(fixture.children.length, 0);
   } finally {
@@ -1196,40 +1158,14 @@ test("rejects a keyed function component with multiple host roots", () => {
 });
 ```
 
-- [ ] **Step 3: Run RED for duplicate keys**
+- [ ] **Step 3: Run GREEN and commit**
 
-Expected: keyed movement, deletion, and replacement pass through Task 7's algorithm. Duplicate keys do not yet throw and may mutate the list ambiguously.
-
-- [ ] **Step 4: Validate sibling keys before record mutation**
-
-Add:
-
-```js
-function validateSiblingKeys(specs) {
-  const seenKeys = new Set();
-
-  for (const spec of specs) {
-    if (spec.key == null) continue;
-    if (seenKeys.has(spec.key)) {
-      throw new TypeError(`Duplicate key among siblings: ${String(spec.key)}`);
-    }
-    seenKeys.add(spec.key);
-  }
-}
-```
-
-Call it as the first line inside `reconcileChildren`:
-
-```js
-validateSiblingKeys(nextSpecs);
-```
-
-- [ ] **Step 5: Run GREEN and commit**
-
-Expected: `23/23 tests passed`, with the original DOM unchanged after the duplicate-key error.
+Expected: `24/24 tests passed`.
 
 ```bash
-git add src/stage-2/runtime.js tests/stage-2/runtime.test.js
+git add tests/stage-2/runtime.test.js \
+  docs/superpowers/plans/2026-08-24-stage-2-reconciliation-identity.md \
+  docs/superpowers/specs/2026-08-24-stage-2-reconciliation-identity-design.md
 git commit -m "test(stage-2): cover keyed reconciliation boundaries"
 ```
 
@@ -1391,7 +1327,7 @@ Expected:
 - Stage 0 task app: `7/7 tests passed`.
 - Stage 1 runtime: `12/12 tests passed`.
 - Stage 1 task app: `8/8 tests passed`.
-- Stage 2 runtime: `23/23 tests passed`.
+- Stage 2 runtime: `24/24 tests passed`.
 - Stage 2 task app: `8/8 tests passed`.
 - No unexpected console errors on any page.
 

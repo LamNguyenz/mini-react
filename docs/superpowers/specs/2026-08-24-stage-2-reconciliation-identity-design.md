@@ -158,7 +158,7 @@ Before matching children, the runtime normalizes renderable input:
 
 The root pseudo-record is what allows arrays to produce multiple root children without pretending a `DocumentFragment` remains in the DOM after insertion.
 
-A keyed function component in this stage must resolve to one host or text root so its key can identify one retained record. Persistent component records and keyed multi-node component groups are deferred.
+A keyed function component in this stage must resolve to one host root so its key can identify one retained record. Keyed text output, persistent component records, and keyed multi-node component groups are deferred.
 
 ## Root Lifecycle and Data Flow
 
@@ -262,7 +262,7 @@ Stage 2 reverses the Stage 1 identity contract: an unrelated rerender must prese
 
 Stage 2 preserves focused synchronous errors for invalid containers, unsupported descriptions, unsupported child types, unsupported props, invalid event handler values, and rendering after unmount.
 
-It adds a duplicate-sibling-key diagnostic when keyed reconciliation is introduced. Errors are not swallowed or recovered. Error boundaries remain outside this stage.
+Duplicate sibling keys remain unsupported. React reports them with a development-only warning rather than throwing; Stage 2 has no development/production diagnostics layer, so that warning is intentionally deferred. Errors from the focused runtime validations are not swallowed or recovered. Error boundaries remain outside this stage.
 
 Expected lesson failures, such as the initial focus loss and later unkeyed-list identity bug, are written as isolated observations so they cannot be confused with unrelated runtime errors.
 
@@ -280,7 +280,7 @@ Runtime tests are introduced one mechanism at a time:
 6. Positional list reconciliation reproduces wrong logical identity after a front insertion.
 7. Stable keys preserve identity through insertion and reordering.
 8. Removed keyed children disconnect from the DOM.
-9. Duplicate sibling keys produce the focused diagnostic.
+9. A keyed function component with multiple host roots is rejected because this stage cannot retain one key for a multi-node group.
 10. Unmount discards retained records and keeps root isolation.
 
 Task application tests copy the Stage 1 behavior contract and change only the identity expectation: filter-driven rerenders preserve the input object, draft, and focus.
@@ -300,7 +300,7 @@ Stage 0 and Stage 1 suites remain regression checks and must continue to pass un
 7. Rebuild the task application with the Stage 2 runtime and prove input preservation.
 8. Reproduce wrong identity after inserting or reordering unkeyed task rows.
 9. Add reserved keys and keyed sibling matching.
-10. Prove keyed insertion, movement, deletion, and duplicate-key diagnostics.
+10. Prove keyed insertion, movement, deletion, and same-key type replacement; defer React-style development warnings for duplicate keys.
 11. Record the mechanism and compare it with the pinned React source boundary.
 12. Complete the explanation gate and Git checkpoint.
 
