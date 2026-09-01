@@ -1307,7 +1307,7 @@ git commit -m "docs(stage-2): record reconciliation findings"
 - [ ] **Step 1: Start one fresh server for final browser verification**
 
 ```bash
-python3 -m http.server 4211
+python3 -m http.server 4250
 ```
 
 - [ ] **Step 2: Verify all browser suites on the exact fresh origin**
@@ -1315,11 +1315,11 @@ python3 -m http.server 4211
 Open each URL and inspect both the visible summary and console:
 
 ```text
-http://localhost:4211/tests/stage-0/task-app.test.html
-http://localhost:4211/tests/stage-1/runtime.test.html
-http://localhost:4211/tests/stage-1/task-app.test.html
-http://localhost:4211/tests/stage-2/runtime.test.html
-http://localhost:4211/tests/stage-2/task-app.test.html
+http://localhost:4250/tests/stage-0/task-app.test.html
+http://localhost:4250/tests/stage-1/runtime.test.html
+http://localhost:4250/tests/stage-1/task-app.test.html
+http://localhost:4250/tests/stage-2/runtime.test.html
+http://localhost:4250/tests/stage-2/task-app.test.html
 ```
 
 Expected:
