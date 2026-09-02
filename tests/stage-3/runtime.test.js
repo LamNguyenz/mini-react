@@ -661,4 +661,29 @@ test("rejects a keyed function component with multiple host roots", () => {
   }
 });
 
+test("function-local data is recreated on every component call", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let incrementPreviousCall;
+
+  function TemporaryCounter() {
+    let count = 0;
+    incrementPreviousCall = () => {
+      count += 1;
+    };
+    return createElement("button", null, String(count));
+  }
+
+  try {
+    root.render(createElement(TemporaryCounter));
+    incrementPreviousCall();
+    root.render(createElement(TemporaryCounter));
+
+    assertEqual(fixture.querySelector("button").textContent, "0");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();
