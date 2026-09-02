@@ -1,7 +1,7 @@
 # Stage 3A Component Identity and State Design
 
 **Date:** 2026-09-02
-**Status:** Approved in conversation; awaiting written-spec review
+**Status:** Approved
 **Depends on:** Completed Stage 2 reconciliation checkpoint
 
 ## Goal
@@ -296,6 +296,7 @@ this.state = {
   tasks: [],
   activeFilter: "all",
   nextTaskId: 1,
+  errorMessage: "",
 };
 ```
 
@@ -304,7 +305,7 @@ updates when they depend on previous state. `render()` derives the visible rows,
 selected filter state, and completion summary from `this.state`.
 
 `mountTaskApp(container)` creates one root, renders
-`createElement(TaskApp, null)`, and returns a `destroy()` method that delegates
+`createElement(TaskApp, null)`, and returns an `unmount()` method that delegates
 to `root.unmount()`.
 
 The text input remains uncontrolled so browser-owned draft state continues to
