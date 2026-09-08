@@ -20,6 +20,13 @@ export function createElement(type, props, ...children) {
   };
 }
 
+export class Component {
+  constructor(props) {
+    this.props = props;
+    this.state = {};
+  }
+}
+
 export function createRoot(container) {
   let isUnmount = false;
   let childRecords = [];
@@ -138,12 +145,24 @@ function hasSameType(oldRecord, description) {
     return typeof description === "string" || typeof description === "number";
   }
 
-  return (
-    oldRecord.kind === "host" &&
-    typeof description === "object" &&
-    typeof description.type === "string" &&
-    oldRecord.type === description.type
-  );
+  if (oldRecord.kind === "host") {
+    return (
+      typeof description === "object" &&
+      typeof description.type === "string" &&
+      oldRecord.type === description.type
+    );
+  }
+
+  if (oldRecord.kind === "component") {
+    return (
+      typeof description === "object" &&
+      description !== null &&
+      isClassComponentDescription(description) &&
+      oldRecord.type === description.type
+    );
+  }
+
+  return false;
 }
 
 function reconcileChildren(parent, oldRecords, nextDescriptions) {
@@ -176,17 +195,20 @@ function reconcileChildren(parent, oldRecords, nextDescriptions) {
       nextRecord = reconcileRecord(parent, oldRecord, nextDescription);
     }
 
+    const nextDom = getDom(nextRecord);
     const anchor = parent.childNodes[i] ?? null;
 
-    if (nextRecord.dom !== anchor) {
-      parent.insertBefore(nextRecord.dom, anchor);
+    if (nextDom !== anchor) {
+      parent.insertBefore(nextDom, anchor);
     }
     nextRecords.push(nextRecord);
   }
 
   for (const oldRecord of oldRecords) {
-    if (!usedRecords.has(oldRecord) && oldRecord.dom.parentNode === parent) {
-      oldRecord.dom.remove();
+    const oldDom = getDom(oldRecord);
+
+    if (!usedRecords.has(oldRecord) && oldDom.parentNode === parent) {
+      oldDom.remove();
     }
   }
 
@@ -196,7 +218,7 @@ function reconcileChildren(parent, oldRecords, nextDescriptions) {
 function reconcileRecord(parent, oldRecord, description) {
   if (!hasSameType(oldRecord, description)) {
     const [nextRecord] = mountRecords(description);
-    parent.replaceChild(nextRecord.dom, oldRecord.dom);
+    parent.replaceChild(getDom(nextRecord), getDom(oldRecord));
     return nextRecord;
   }
 
@@ -219,6 +241,18 @@ function reconcileRecord(parent, oldRecord, description) {
       oldRecord.children,
       nextDescriptions,
     );
+    oldRecord.props = description.props;
+    return oldRecord;
+  }
+
+  if (oldRecord.kind === "component") {
+    oldRecord.instance.props = description.props;
+
+    const output = oldRecord.instance.render();
+    const [nextDescription] = expandDescriptions(output);
+
+    oldRecord.child = reconcileRecord(parent, oldRecord.child, nextDescription);
+
     oldRecord.props = description.props;
     return oldRecord;
   }
@@ -257,7 +291,7 @@ function mountRecords(description) {
 
     const children = childDescriptions.flatMap(mountRecords);
 
-    dom.append(...children.map((child) => child.dom));
+    dom.append(...children.map((child) => getDom(child)));
 
     return [
       {
@@ -275,6 +309,21 @@ function mountRecords(description) {
     typeof description === "object" &&
     typeof description.type === "function"
   ) {
+    if (isClassComponentDescription(description)) {
+      const instance = new description.type(description.props);
+      const output = instance.render();
+      const [child] = mountRecords(output);
+      return [
+        {
+          kind: "component",
+          type: description.type,
+          key: description.key ?? null,
+          props: description.props,
+          instance,
+          child,
+        },
+      ];
+    }
     const output = description.type(description.props);
     return mountRecords(output);
   }
@@ -295,8 +344,11 @@ function expandDescriptions(description) {
     typeof description === "object" &&
     typeof description.type === "function"
   ) {
-    const output = description.type(description.props);
+    if (isClassComponentDescription(description)) {
+      return [description];
+    }
 
+    const output = description.type(description.props);
     const outputDescriptions = expandDescriptions(output);
 
     if (description.key != null && outputDescriptions.length !== 1) {
@@ -321,4 +373,13 @@ function expandDescriptions(description) {
   }
 
   return [description];
+}
+
+// Small Utility
+function isClassComponentDescription(description) {
+  return description.type.prototype instanceof Component;
+}
+
+function getDom(record) {
+  return record.kind === "component" ? getDom(record.child) : record.dom;
 }

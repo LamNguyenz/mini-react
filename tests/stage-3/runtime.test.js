@@ -4,7 +4,9 @@ import {
   run,
   test,
 } from "../browser/harness.js";
-import { createElement, createRoot } from "../../src/stage-3/runtime.js";
+import * as MiniReact from "../../src/stage-3/runtime.js";
+
+const { createElement, createRoot } = MiniReact;
 
 function createFixture() {
   const fixture = document.createElement("div");
@@ -680,6 +682,72 @@ test("function-local data is recreated on every component call", () => {
     root.render(createElement(TemporaryCounter));
 
     assertEqual(fixture.querySelector("button").textContent, "0");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("mounts a class component from persistent initial state", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let instance;
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      instance = this;
+      this.state = { count: props.initialCount };
+    }
+
+    render() {
+      return createElement(
+        "button",
+        { "data-counter": "" },
+        this.state.count,
+      );
+    }
+  }
+
+  try {
+    root.render(createElement(Counter, { initialCount: 2 }));
+
+    assertEqual(instance.props.initialCount, 2);
+    assertEqual(instance.state.count, 2);
+    assertEqual(fixture.querySelector("button").textContent, "2");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("reuses a class instance and gives it the next props", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  const instances = [];
+
+  class Greeting extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      instances.push(this);
+      this.state = { punctuation: "!" };
+    }
+
+    render() {
+      return createElement("p", null, this.props.name, this.state.punctuation);
+    }
+  }
+
+  try {
+    root.render(createElement(Greeting, { name: "Ada" }));
+    const paragraph = fixture.querySelector("p");
+
+    root.render(createElement(Greeting, { name: "Grace" }));
+
+    assertEqual(instances.length, 1);
+    assertEqual(fixture.querySelector("p") === paragraph, true);
+    assertEqual(paragraph.textContent, "Grace!");
+    assertEqual(instances[0].props.name, "Grace");
   } finally {
     root.unmount();
     fixture.remove();
