@@ -790,4 +790,71 @@ test("setState shallowly merges state and preserves host identity", () => {
   }
 });
 
+test("functional updates receive the latest state and props", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      this.state = { count: 0 };
+    }
+
+    render() {
+      return createElement(
+        "button",
+        {
+          onClick: () => {
+            this.setState((state, props) => ({
+              count: state.count + props.step,
+            }));
+            this.setState((state, props) => ({
+              count: state.count + props.step,
+            }));
+          },
+        },
+        this.state.count,
+      );
+    }
+  }
+
+  try {
+    root.render(createElement(Counter, { step: 2 }));
+    fixture.querySelector("button").click();
+    assertEqual(fixture.querySelector("button").textContent, "4");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects a functional updater that returns a non-object", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let instance;
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      instance = this;
+    }
+
+    render() {
+      return createElement("button", null, "Counter");
+    }
+  }
+
+  try {
+    root.render(createElement(Counter));
+    assertThrows(
+      () => instance.setState(() => null),
+      TypeError,
+      "A state updater must return an object",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();

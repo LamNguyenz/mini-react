@@ -30,10 +30,11 @@ export class Component {
   setState(partialState) {
     if (
       partialState === null ||
-      typeof partialState !== "object" ||
+      (typeof partialState !== "object" &&
+        typeof partialState !== "function") ||
       Array.isArray(partialState)
     ) {
-      throw new TypeError("setState requires an object");
+      throw new TypeError("setState requires an object or updater function");
     }
 
     if (this.__enqueueStateUpdate === null) {
@@ -271,9 +272,22 @@ function processPendingState(record) {
   let nextState = record.instance.state;
 
   for (const update of record.pendingUpdates) {
+    let partialState =
+      typeof update === "function"
+        ? update(nextState, record.instance.props)
+        : update;
+
+    if (
+      partialState === null ||
+      typeof partialState !== "object" ||
+      Array.isArray(partialState)
+    ) {
+      throw new TypeError("A state updater must return an object");
+    }
+
     nextState = {
       ...nextState,
-      ...update,
+      ...partialState,
     };
   }
   record.pendingUpdates = [];
