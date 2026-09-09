@@ -24,24 +24,72 @@ export class Component {
   constructor(props) {
     this.props = props;
     this.state = {};
+    this.__enqueueStateUpdate = null;
+  }
+
+  setState(partialState) {
+    if (
+      partialState === null ||
+      typeof partialState !== "object" ||
+      Array.isArray(partialState)
+    ) {
+      throw new TypeError("setState requires an object");
+    }
+
+    if (this.__enqueueStateUpdate === null) {
+      throw new Error("Cannot update component state before mounting");
+    }
+
+    this.__enqueueStateUpdate(partialState);
   }
 }
 
 export function createRoot(container) {
   let isUnmount = false;
+  let currentElement = null;
   let childRecords = [];
 
   if (!(container instanceof HTMLElement)) {
     throw new TypeError("createRoot requires an HTMLElement container");
   }
 
+  let isRendering = false;
+  const rootContext = {
+    get isRendering() {
+      return isRendering;
+    },
+
+    requestRender() {
+      performRender();
+    },
+  };
+
+  function performRender() {
+    if (isRendering) {
+      throw new Error("Cannot update state while rendering");
+    }
+
+    isRendering = true;
+    try {
+      const nextDescriptions = expandDescriptions(currentElement);
+
+      childRecords = reconcileChildren(
+        container,
+        childRecords,
+        nextDescriptions,
+        rootContext,
+      );
+    } finally {
+      isRendering = false;
+    }
+  }
+
   function render(element) {
     if (isUnmount) {
       throw Error("Cannot render an unmounted root");
     }
-
-    const nextDescriptions = expandDescriptions(element);
-    childRecords = reconcileChildren(container, childRecords, nextDescriptions);
+    currentElement = element;
+    performRender();
   }
 
   function unmount() {
@@ -165,7 +213,7 @@ function hasSameType(oldRecord, description) {
   return false;
 }
 
-function reconcileChildren(parent, oldRecords, nextDescriptions) {
+function reconcileChildren(parent, oldRecords, nextDescriptions, rootContext) {
   const oldKeys = new Map();
   const oldUnkeyedByIndex = new Map();
 
@@ -189,15 +237,19 @@ function reconcileChildren(parent, oldRecords, nextDescriptions) {
 
     let nextRecord;
     if (oldRecord == null) {
-      [nextRecord] = mountRecords(nextDescription);
+      [nextRecord] = mountRecords(nextDescription, rootContext);
     } else {
       usedRecords.add(oldRecord);
-      nextRecord = reconcileRecord(parent, oldRecord, nextDescription);
+      nextRecord = reconcileRecord(
+        parent,
+        oldRecord,
+        nextDescription,
+        rootContext,
+      );
     }
 
     const nextDom = getDom(nextRecord);
     const anchor = parent.childNodes[i] ?? null;
-
     if (nextDom !== anchor) {
       parent.insertBefore(nextDom, anchor);
     }
@@ -215,9 +267,22 @@ function reconcileChildren(parent, oldRecords, nextDescriptions) {
   return nextRecords;
 }
 
-function reconcileRecord(parent, oldRecord, description) {
+function processPendingState(record) {
+  let nextState = record.instance.state;
+
+  for (const update of record.pendingUpdates) {
+    nextState = {
+      ...nextState,
+      ...update,
+    };
+  }
+  record.pendingUpdates = [];
+  record.instance.state = nextState;
+}
+
+function reconcileRecord(parent, oldRecord, description, rootContext) {
   if (!hasSameType(oldRecord, description)) {
-    const [nextRecord] = mountRecords(description);
+    const [nextRecord] = mountRecords(description, rootContext);
     parent.replaceChild(getDom(nextRecord), getDom(oldRecord));
     return nextRecord;
   }
@@ -240,6 +305,7 @@ function reconcileRecord(parent, oldRecord, description) {
       oldRecord.dom,
       oldRecord.children,
       nextDescriptions,
+      rootContext,
     );
     oldRecord.props = description.props;
     return oldRecord;
@@ -247,24 +313,30 @@ function reconcileRecord(parent, oldRecord, description) {
 
   if (oldRecord.kind === "component") {
     oldRecord.instance.props = description.props;
+    processPendingState(oldRecord);
 
     const output = oldRecord.instance.render();
     const [nextDescription] = expandDescriptions(output);
 
-    oldRecord.child = reconcileRecord(parent, oldRecord.child, nextDescription);
+    oldRecord.child = reconcileRecord(
+      parent,
+      oldRecord.child,
+      nextDescription,
+      rootContext,
+    );
 
     oldRecord.props = description.props;
     return oldRecord;
   }
 }
 
-function mountRecords(description) {
+function mountRecords(description, rootContext) {
   if (description == null || typeof description === "boolean") {
     return [];
   }
 
   if (Array.isArray(description)) {
-    return description.flatMap(mountRecords);
+    return description.flatMap((child) => mountRecords(child, rootContext));
   }
 
   if (typeof description == "string" || typeof description == "number") {
@@ -289,7 +361,9 @@ function mountRecords(description) {
 
     const childDescriptions = expandDescriptions(description.props.children);
 
-    const children = childDescriptions.flatMap(mountRecords);
+    const children = childDescriptions.flatMap((child) =>
+      mountRecords(child, rootContext),
+    );
 
     dom.append(...children.map((child) => getDom(child)));
 
@@ -311,21 +385,34 @@ function mountRecords(description) {
   ) {
     if (isClassComponentDescription(description)) {
       const instance = new description.type(description.props);
+
+      const record = {
+        kind: "component",
+        type: description.type,
+        key: description.key ?? null,
+        props: description.props,
+        instance,
+        child: null,
+        pendingUpdates: [],
+      };
+
+      instance.__enqueueStateUpdate = (update) => {
+        if (rootContext.isRendering) {
+          throw new Error("Cannot update state while rendering");
+        }
+
+        record.pendingUpdates.push(update);
+        rootContext.requestRender();
+      };
+
       const output = instance.render();
-      const [child] = mountRecords(output);
-      return [
-        {
-          kind: "component",
-          type: description.type,
-          key: description.key ?? null,
-          props: description.props,
-          instance,
-          child,
-        },
-      ];
+      const [child] = mountRecords(output, rootContext);
+      record.child = child;
+
+      return [record];
     }
     const output = description.type(description.props);
-    return mountRecords(output);
+    return mountRecords(output, rootContext);
   }
 
   throw TypeError("Unsupported child description");

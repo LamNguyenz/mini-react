@@ -754,4 +754,40 @@ test("reuses a class instance and gives it the next props", () => {
   }
 });
 
+test("setState shallowly merges state and preserves host identity", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let instance;
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      instance = this;
+      this.state = { count: 0, label: "Count" };
+    }
+
+    render() {
+      return createElement(
+        "button",
+        { onClick: () => this.setState({ count: 1 }) },
+        `${this.state.label}: ${this.state.count}`,
+      );
+    }
+  }
+
+  try {
+    root.render(createElement(Counter));
+    const button = fixture.querySelector("button");
+    button.click();
+
+    assertEqual(fixture.querySelector("button") === button, true);
+    assertEqual(button.textContent, "Count: 1");
+    assertEqual(instance.state.count, 1);
+    assertEqual(instance.state.label, "Count");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();
