@@ -857,4 +857,130 @@ test("rejects a functional updater that returns a non-object", () => {
   }
 });
 
+test("separate component instances own independent state", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      this.state = { count: 0 };
+    }
+
+    render() {
+      return createElement(
+        "button",
+        {
+          "data-id": this.props.id,
+          onClick: () =>
+            this.setState((state) => ({ count: state.count + 1 })),
+        },
+        `${this.props.id}:${this.state.count}`,
+      );
+    }
+  }
+
+  try {
+    root.render(
+      createElement(
+        "div",
+        null,
+        createElement(Counter, { key: "a", id: "a" }),
+        createElement(Counter, { key: "b", id: "b" }),
+      ),
+    );
+    fixture.querySelector('[data-id="a"]').click();
+    assertEqual(fixture.querySelector('[data-id="a"]').textContent, "a:1");
+    assertEqual(fixture.querySelector('[data-id="b"]').textContent, "b:0");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("keyed movement preserves component state and host identity", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      this.state = { count: 0 };
+    }
+
+    render() {
+      return createElement(
+        "button",
+        {
+          "data-id": this.props.id,
+          onClick: () =>
+            this.setState((state) => ({ count: state.count + 1 })),
+        },
+        `${this.props.id}:${this.state.count}`,
+      );
+    }
+  }
+
+  const view = (ids) =>
+    createElement(
+      "div",
+      null,
+      ids.map((id) => createElement(Counter, { key: id, id })),
+    );
+
+  try {
+    root.render(view(["a", "b"]));
+    const buttonA = fixture.querySelector('[data-id="a"]');
+    const buttonB = fixture.querySelector('[data-id="b"]');
+    buttonA.click();
+    root.render(view(["b", "a"]));
+    const buttons = [...fixture.querySelectorAll("button")];
+
+    assertEqual(buttons[0] === buttonB, true);
+    assertEqual(buttons[1] === buttonA, true);
+    assertEqual(buttons[1].textContent, "a:1");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("nested component records expose their host node for movement", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  class Leaf extends MiniReact.Component {
+    render() {
+      return createElement("span", { "data-id": this.props.id }, this.props.id);
+    }
+  }
+
+  class Wrapper extends MiniReact.Component {
+    render() {
+      return createElement(Leaf, { id: this.props.id });
+    }
+  }
+
+  const view = (ids) =>
+    createElement(
+      "div",
+      null,
+      ids.map((id) => createElement(Wrapper, { key: id, id })),
+    );
+
+  try {
+    root.render(view(["a", "b"]));
+    const spanA = fixture.querySelector('[data-id="a"]');
+    const spanB = fixture.querySelector('[data-id="b"]');
+    root.render(view(["b", "a"]));
+    const spans = [...fixture.querySelectorAll("span")];
+
+    assertEqual(spans[0] === spanB, true);
+    assertEqual(spans[1] === spanA, true);
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();
