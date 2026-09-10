@@ -983,4 +983,120 @@ test("nested component records expose their host node for movement", () => {
   }
 });
 
+test("a changed key creates fresh state and detaches the old instance", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  const instances = [];
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      instances.push(this);
+      this.state = { count: 0 };
+    }
+
+    render() {
+      return createElement(
+        "button",
+        { onClick: () => this.setState({ count: 1 }) },
+        this.state.count,
+      );
+    }
+  }
+
+  try {
+    root.render(createElement(Counter, { key: "first" }));
+    fixture.querySelector("button").click();
+    const oldInstance = instances[0];
+    root.render(createElement(Counter, { key: "second" }));
+
+    assertEqual(instances.length, 2);
+    assertEqual(fixture.querySelector("button").textContent, "0");
+    assertThrows(
+      () => oldInstance.setState({ count: 2 }),
+      Error,
+      "Cannot update an unmounted component",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("root unmount detaches retained component instances", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let instance;
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      instance = this;
+    }
+
+    render() {
+      return createElement("button", null, "Counter");
+    }
+  }
+
+  try {
+    root.render(createElement(Counter));
+    root.unmount();
+    assertThrows(
+      () => instance.setState({ count: 1 }),
+      Error,
+      "Cannot update an unmounted component",
+    );
+  } finally {
+    fixture.remove();
+  }
+});
+
+test("a changed component type creates a fresh instance", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let firstInstance;
+  let secondInstance;
+
+  class FirstCounter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      firstInstance = this;
+      this.state = { label: "first" };
+    }
+
+    render() {
+      return createElement("button", null, this.state.label);
+    }
+  }
+
+  class SecondCounter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      secondInstance = this;
+      this.state = { label: "second" };
+    }
+
+    render() {
+      return createElement("button", null, this.state.label);
+    }
+  }
+
+  try {
+    root.render(createElement(FirstCounter, { key: "counter" }));
+    root.render(createElement(SecondCounter, { key: "counter" }));
+
+    assertEqual(firstInstance === secondInstance, false);
+    assertEqual(fixture.querySelector("button").textContent, "second");
+    assertThrows(
+      () => firstInstance.setState({ label: "stale" }),
+      Error,
+      "Cannot update an unmounted component",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();

@@ -25,9 +25,13 @@ export class Component {
     this.props = props;
     this.state = {};
     this.__enqueueStateUpdate = null;
+    this.__status = "constructing";
   }
 
   setState(partialState) {
+    if (this.__status === "unmounted") {
+      throw new Error("Cannot update an unmounted component");
+    }
     if (
       partialState === null ||
       (typeof partialState !== "object" &&
@@ -95,6 +99,10 @@ export function createRoot(container) {
 
   function unmount() {
     if (isUnmount) return;
+
+    for (const record of childRecords) {
+      detachRecord(record);
+    }
 
     isUnmount = true;
     container.replaceChildren();
@@ -261,6 +269,7 @@ function reconcileChildren(parent, oldRecords, nextDescriptions, rootContext) {
     const oldDom = getDom(oldRecord);
 
     if (!usedRecords.has(oldRecord) && oldDom.parentNode === parent) {
+      detachRecord(oldRecord);
       oldDom.remove();
     }
   }
@@ -298,6 +307,7 @@ function reconcileRecord(parent, oldRecord, description, rootContext) {
   if (!hasSameType(oldRecord, description)) {
     const [nextRecord] = mountRecords(description, rootContext);
     parent.replaceChild(getDom(nextRecord), getDom(oldRecord));
+    detachRecord(oldRecord);
     return nextRecord;
   }
 
@@ -430,6 +440,19 @@ function mountRecords(description, rootContext) {
   }
 
   throw TypeError("Unsupported child description");
+}
+
+function detachRecord(record) {
+  if (record.kind === "component") {
+    record.instance.__status = "unmounted";
+    record.instance.__enqueueStateUpdate = null;
+    detachRecord(record.child);
+  }
+  if (record.kind === "host") {
+    for (const child of record.children) {
+      detachRecord(child);
+    }
+  }
 }
 
 function expandDescriptions(description) {
