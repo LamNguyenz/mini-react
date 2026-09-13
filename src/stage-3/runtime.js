@@ -28,15 +28,23 @@ export class Component {
     this.__status = "constructing";
   }
 
-  setState(partialState) {
-    if (this.__status === "unmounted") {
-      throw new Error("Cannot update an unmounted component");
+  setState(update, callback) {
+    if (callback !== undefined) {
+      throw new TypeError("setState callbacks are not supported");
+    }
+    switch (this.__status) {
+      case "constructing":
+        throw new Error("Cannot update state during component construction");
+      case "rendering":
+        throw new Error("Cannot update state while rendering");
+      case "unmounted":
+        throw new Error("Cannot update an unmounted component");
+      default:
     }
     if (
-      partialState === null ||
-      (typeof partialState !== "object" &&
-        typeof partialState !== "function") ||
-      Array.isArray(partialState)
+      update === null ||
+      (typeof update !== "object" && typeof update !== "function") ||
+      Array.isArray(update)
     ) {
       throw new TypeError("setState requires an object or updater function");
     }
@@ -45,7 +53,7 @@ export class Component {
       throw new Error("Cannot update component state before mounting");
     }
 
-    this.__enqueueStateUpdate(partialState);
+    this.__enqueueStateUpdate(update);
   }
 }
 
@@ -339,8 +347,18 @@ function reconcileRecord(parent, oldRecord, description, rootContext) {
     oldRecord.instance.props = description.props;
     processPendingState(oldRecord);
 
-    const output = oldRecord.instance.render();
-    const [nextDescription] = expandDescriptions(output);
+    oldRecord.instance.__status = "rendering";
+
+    let nextDescription;
+    try {
+      nextDescription = resolveSingleComponentOutput(
+        oldRecord.instance.render(),
+      );
+    } finally {
+      if (oldRecord.instance.__status !== "unmounted") {
+        oldRecord.instance.__status = "mounted";
+      }
+    }
 
     oldRecord.child = reconcileRecord(
       parent,
@@ -410,6 +428,16 @@ function mountRecords(description, rootContext) {
     if (isClassComponentDescription(description)) {
       const instance = new description.type(description.props);
 
+      const instanceState = instance.state;
+
+      if (
+        instanceState === null ||
+        typeof instanceState !== "object" ||
+        Array.isArray(instanceState)
+      ) {
+        throw new TypeError("Component state must be an object");
+      }
+
       const record = {
         kind: "component",
         type: description.type,
@@ -429,8 +457,17 @@ function mountRecords(description, rootContext) {
         rootContext.requestRender();
       };
 
-      const output = instance.render();
-      const [child] = mountRecords(output, rootContext);
+      instance.__status = "rendering";
+      let childDescription;
+      try {
+        childDescription = resolveSingleComponentOutput(instance.render());
+      } finally {
+        if (instance.__status !== "unmounted") {
+          instance.__status = "mounted";
+        }
+      }
+
+      const [child] = mountRecords(childDescription, rootContext);
       record.child = child;
 
       return [record];
@@ -497,6 +534,18 @@ function expandDescriptions(description) {
   }
 
   return [description];
+}
+
+function resolveSingleComponentOutput(output) {
+  const descriptions = expandDescriptions(output);
+
+  if (descriptions.length !== 1) {
+    throw new TypeError(
+      "A class component must return exactly one non-empty root",
+    );
+  }
+
+  return descriptions[0];
 }
 
 // Small Utility

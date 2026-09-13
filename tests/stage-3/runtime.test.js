@@ -1099,4 +1099,172 @@ test("a changed component type creates a fresh instance", () => {
   }
 });
 
+test("rejects non-object initial component state", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  class InvalidState extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      this.state = [];
+    }
+
+    render() {
+      return createElement("p", null, "Invalid");
+    }
+  }
+
+  try {
+    assertThrows(
+      () => root.render(createElement(InvalidState)),
+      TypeError,
+      "Component state must be an object",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects a non-object, non-function setState argument", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let instance;
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      instance = this;
+    }
+
+    render() {
+      return createElement("button", null, "Counter");
+    }
+  }
+
+  try {
+    root.render(createElement(Counter));
+    assertThrows(
+      () => instance.setState(null),
+      TypeError,
+      "setState requires an object or updater function",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects empty or multiple class-component roots", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  class Empty extends MiniReact.Component {
+    render() {
+      return null;
+    }
+  }
+
+  class Multiple extends MiniReact.Component {
+    render() {
+      return [createElement("span"), createElement("span")];
+    }
+  }
+
+  try {
+    assertThrows(
+      () => root.render(createElement(Empty)),
+      TypeError,
+      "A class component must return exactly one non-empty root",
+    );
+    assertThrows(
+      () => root.render(createElement(Multiple)),
+      TypeError,
+      "A class component must return exactly one non-empty root",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects setState during render", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  class InvalidRender extends MiniReact.Component {
+    render() {
+      this.setState({ count: 1 });
+      return createElement("p", null, "Invalid");
+    }
+  }
+
+  try {
+    assertThrows(
+      () => root.render(createElement(InvalidRender)),
+      Error,
+      "Cannot update state while rendering",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects setState during component construction", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+
+  class InvalidConstruction extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      this.setState({ count: 1 });
+    }
+
+    render() {
+      return createElement("p", null, "Invalid");
+    }
+  }
+
+  try {
+    assertThrows(
+      () => root.render(createElement(InvalidConstruction)),
+      Error,
+      "Cannot update state during component construction",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("rejects the unsupported setState callback argument", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  let instance;
+
+  class Counter extends MiniReact.Component {
+    constructor(props) {
+      super(props);
+      instance = this;
+    }
+
+    render() {
+      return createElement("p", null, "Counter");
+    }
+  }
+
+  try {
+    root.render(createElement(Counter));
+    assertThrows(
+      () => instance.setState({}, () => {}),
+      TypeError,
+      "setState callbacks are not supported",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 run();
