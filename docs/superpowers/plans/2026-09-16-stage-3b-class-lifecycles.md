@@ -49,11 +49,10 @@
 
 - `src/stage-3/runtime.js` — root lifecycle queue, lifecycle scheduling, previous-value capture, and unmount cleanup.
 - `package.json` — `build:stage3-lifecycle-tests` command.
-- `.gitignore` — exact generated lifecycle test module path.
 
 ### Generated but never committed
 
-- `tests/stage-3/lifecycle.test.generated.js` — bundled browser module with inline source map.
+- `dist/tests/stage-3/lifecycle.test.js` — bundled browser module with inline source map, covered by the existing `dist/` ignore rule.
 
 ---
 
@@ -63,21 +62,12 @@
 - Create: `tests/stage-3/lifecycle.test.jsx`
 - Create: `tests/stage-3/lifecycle.test.html`
 - Modify: `package.json`
-- Modify: `.gitignore`
 
 **Interfaces:**
 - Consumes: `createElement`, `Component`, and `createRoot` from `src/stage-3/runtime.js`; `test`, `assert`, `assertEqual`, `assertThrows`, and `run` from `tests/browser/harness.js`.
 - Produces: `npm run build:stage3-lifecycle-tests` and the browser page `/tests/stage-3/lifecycle.test.html` used by every later task.
 
-- [ ] **Step 1: Add the generated artifact to `.gitignore`**
-
-Append exactly:
-
-```gitignore
-tests/stage-3/lifecycle.test.generated.js
-```
-
-- [ ] **Step 2: Add the esbuild command to `package.json`**
+- [ ] **Step 1: Add the esbuild command to `package.json`**
 
 Keep the existing script and add:
 
@@ -85,12 +75,12 @@ Keep the existing script and add:
 {
   "scripts": {
     "inspect:stage1-jsx": "esbuild examples/stage-1/jsx-example.jsx --jsx=transform --jsx-factory=createElement --format=esm --log-level=warning",
-    "build:stage3-lifecycle-tests": "esbuild tests/stage-3/lifecycle.test.jsx --bundle --format=esm --jsx=transform --jsx-factory=createElement --sourcemap=inline --outfile=tests/stage-3/lifecycle.test.generated.js"
+    "build:stage3-lifecycle-tests": "esbuild tests/stage-3/lifecycle.test.jsx --bundle --format=esm --jsx=transform --jsx-factory=createElement --sourcemap=inline --outfile=dist/tests/stage-3/lifecycle.test.js"
   }
 }
 ```
 
-- [ ] **Step 3: Create the JSX test source**
+- [ ] **Step 2: Create the JSX test source**
 
 Create `tests/stage-3/lifecycle.test.jsx`:
 
@@ -132,7 +122,7 @@ test("JSX creates descriptions for the Mini React runtime", () => {
 await run();
 ```
 
-- [ ] **Step 4: Create the browser runner**
+- [ ] **Step 3: Create the browser runner**
 
 Create `tests/stage-3/lifecycle.test.html`:
 
@@ -148,18 +138,18 @@ Create `tests/stage-3/lifecycle.test.html`:
     <h1>Stage 3 lifecycle tests</h1>
     <p data-test-summary>Tests have not run.</p>
     <ol data-test-results></ol>
-    <script type="module" src="./lifecycle.test.generated.js"></script>
+    <script type="module" src="../../dist/tests/stage-3/lifecycle.test.js"></script>
   </body>
 </html>
 ```
 
-- [ ] **Step 5: Build and verify the JSX smoke test**
+- [ ] **Step 4: Build and verify the JSX smoke test**
 
 Run:
 
 ```bash
 npm run build:stage3-lifecycle-tests
-git check-ignore tests/stage-3/lifecycle.test.generated.js
+git check-ignore dist/tests/stage-3/lifecycle.test.js
 ```
 
 Open:
@@ -176,10 +166,10 @@ Expected:
 
 Inspect the generated file only long enough to confirm that the JSX became calls to the imported Mini React `createElement`. Do not stage the generated file.
 
-- [ ] **Step 6: Commit the JSX test entry point**
+- [ ] **Step 5: Commit the JSX test entry point**
 
 ```bash
-git add .gitignore package.json tests/stage-3/lifecycle.test.jsx tests/stage-3/lifecycle.test.html
+git add package.json tests/stage-3/lifecycle.test.jsx tests/stage-3/lifecycle.test.html
 git commit -m "test(stage-3): add JSX lifecycle test entry point"
 ```
 
@@ -1215,7 +1205,7 @@ Then run:
 ```bash
 npm run inspect:stage1-jsx
 npm run build:stage3-lifecycle-tests
-git check-ignore tests/stage-3/lifecycle.test.generated.js
+git check-ignore dist/tests/stage-3/lifecycle.test.js
 git diff --check
 git status --short
 ```
@@ -1223,7 +1213,7 @@ git status --short
 Expected:
 
 - both npm commands exit `0`;
-- `git check-ignore` prints `tests/stage-3/lifecycle.test.generated.js`;
+- `git check-ignore` prints `dist/tests/stage-3/lifecycle.test.js`;
 - `git diff --check` prints nothing;
 - status contains only intentional Stage 3B changes and the pre-existing `.codeflow/` paths;
 - the generated test module does not appear as staged or untracked.

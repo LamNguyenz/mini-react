@@ -197,7 +197,7 @@ esbuild tests/stage-3/lifecycle.test.jsx \
   --jsx=transform \
   --jsx-factory=createElement \
   --sourcemap=inline \
-  --outfile=tests/stage-3/lifecycle.test.generated.js
+  --outfile=dist/tests/stage-3/lifecycle.test.js
 ```
 
 This provides:
@@ -208,16 +208,17 @@ This provides:
 - bundling for the browser test page;
 - an inline source map.
 
-It will produce an ignored browser artifact:
+It will produce a browser artifact under the repository's already-ignored
+generated-output directory:
 
 ```text
-tests/stage-3/lifecycle.test.generated.js
+dist/tests/stage-3/lifecycle.test.js
 ```
 
 The committed `lifecycle.test.html` page imports that generated module, and
-`.gitignore` contains the exact generated path. Editing the JSX requires
-rerunning `npm run build:stage3-lifecycle-tests`, but the existing Python server
-on port `4250` does not need to restart.
+the existing `dist/` rule keeps every generated test bundle out of Git. Editing
+the JSX requires rerunning `npm run build:stage3-lifecycle-tests`, but the
+existing Python server on port `4250` does not need to restart.
 
 JSX such as:
 
@@ -259,7 +260,6 @@ Expected implementation work is limited to:
 - `tests/stage-3/lifecycle.test.jsx`
 - `tests/stage-3/lifecycle.test.html`
 - `package.json`
-- `.gitignore`
 - `notes/stage-3-lifecycles.md`
 
 The generated browser test module is ignored and is not committed.
