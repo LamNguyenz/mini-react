@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "inspect:stage1-jsx": "esbuild examples/stage-1/jsx-example.jsx --jsx=transform --jsx-factory=createElement --format=esm --log-level=warning"
+    "inspect:stage1-jsx": "esbuild examples/stage-1/jsx-example.jsx --jsx=transform --jsx-factory=createElement --format=esm --log-level=warning",
+    "build:stage3-lifecycle-tests": "esbuild tests/stage-3/lifecycle.test.jsx --bundle --format=esm --jsx=transform --jsx-factory=createElement --sourcemap=inline --outfile=dist/tests/stage-3/lifecycle.test.js"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

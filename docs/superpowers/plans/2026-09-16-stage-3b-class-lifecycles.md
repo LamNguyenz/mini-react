@@ -67,7 +67,7 @@
 - Consumes: `createElement`, `Component`, and `createRoot` from `src/stage-3/runtime.js`; `test`, `assert`, `assertEqual`, `assertThrows`, and `run` from `tests/browser/harness.js`.
 - Produces: `npm run build:stage3-lifecycle-tests` and the browser page `/tests/stage-3/lifecycle.test.html` used by every later task.
 
-- [ ] **Step 1: Add the esbuild command to `package.json`**
+- [x] **Step 1: Add the esbuild command to `package.json`**
 
 Keep the existing script and add:
 
@@ -80,7 +80,7 @@ Keep the existing script and add:
 }
 ```
 
-- [ ] **Step 2: Create the JSX test source**
+- [x] **Step 2: Create the JSX test source**
 
 Create `tests/stage-3/lifecycle.test.jsx`:
 
@@ -122,7 +122,7 @@ test("JSX creates descriptions for the Mini React runtime", () => {
 await run();
 ```
 
-- [ ] **Step 3: Create the browser runner**
+- [x] **Step 3: Create the browser runner**
 
 Create `tests/stage-3/lifecycle.test.html`:
 
@@ -143,7 +143,7 @@ Create `tests/stage-3/lifecycle.test.html`:
 </html>
 ```
 
-- [ ] **Step 4: Build and verify the JSX smoke test**
+- [x] **Step 4: Build and verify the JSX smoke test**
 
 Run:
 
@@ -166,7 +166,7 @@ Expected:
 
 Inspect the generated file only long enough to confirm that the JSX became calls to the imported Mini React `createElement`. Do not stage the generated file.
 
-- [ ] **Step 5: Commit the JSX test entry point**
+- [x] **Step 5: Commit the JSX test entry point**
 
 ```bash
 git add package.json tests/stage-3/lifecycle.test.jsx tests/stage-3/lifecycle.test.html
