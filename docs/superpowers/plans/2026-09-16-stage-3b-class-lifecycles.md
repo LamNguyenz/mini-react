@@ -186,7 +186,7 @@ git commit -m "test(stage-3): add JSX lifecycle test entry point"
 - Consumes: `rootContext` passed through `mountRecords(description, rootContext)`.
 - Produces: `rootContext.enqueueLifecycle(callback)` and post-render lifecycle flushing; later update work uses the same queue.
 
-- [ ] **Step 1: Append failing mount-order tests before `await run()`**
+- [x] **Step 1: Append failing mount-order tests before `await run()`**
 
 ```jsx
 test("mount lifecycles see connected DOM and run child before parent", () => {
@@ -267,7 +267,7 @@ test("keyed movement does not mount a retained component again", () => {
 });
 ```
 
-- [ ] **Step 2: Rebuild and verify the mount tests fail**
+- [x] **Step 2: Rebuild and verify the mount tests fail**
 
 Run:
 
@@ -279,7 +279,7 @@ Refresh the lifecycle page.
 
 Expected: `1/3 tests passed`; both new tests fail because `componentDidMount()` is never called.
 
-- [ ] **Step 3: Add the root lifecycle queue**
+- [x] **Step 3: Add the root lifecycle queue**
 
 Inside `createRoot`, add lifecycle storage and expose one queue operation through `rootContext`:
 
@@ -338,7 +338,7 @@ function performRender() {
 }
 ```
 
-- [ ] **Step 4: Register mount callbacks child before parent**
+- [x] **Step 4: Register mount callbacks child before parent**
 
 In the class-component branch of `mountRecords`, enqueue after its child record has mounted:
 
@@ -357,7 +357,7 @@ return [record];
 
 Recursive child mounting reaches this code before the parent, so the queue order is child then parent. The root flushes only after `reconcileChildren` has inserted the returned host DOM.
 
-- [ ] **Step 5: Rebuild and verify mount behavior**
+- [x] **Step 5: Rebuild and verify mount behavior**
 
 Run:
 
@@ -373,7 +373,7 @@ Expected lifecycle page summary:
 
 Also refresh `tests/stage-3/runtime.test.html`; expected `42/42 tests passed`.
 
-- [ ] **Step 6: Commit mount lifecycle behavior**
+- [x] **Step 6: Commit mount lifecycle behavior**
 
 ```bash
 git add src/stage-3/runtime.js tests/stage-3/lifecycle.test.jsx

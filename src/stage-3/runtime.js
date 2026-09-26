@@ -61,15 +61,21 @@ export function createRoot(container) {
   let isUnmount = false;
   let currentElement = null;
   let childRecords = [];
+  let lifecycleCallbacks = [];
 
   if (!(container instanceof HTMLElement)) {
     throw new TypeError("createRoot requires an HTMLElement container");
   }
 
   let isRendering = false;
+
   const rootContext = {
     get isRendering() {
       return isRendering;
+    },
+
+    enqueueLifecycle(callback) {
+      lifecycleCallbacks.push(callback);
     },
 
     requestRender() {
@@ -77,12 +83,22 @@ export function createRoot(container) {
     },
   };
 
+  function flushLifecycleCallbacks() {
+    const callbacks = lifecycleCallbacks;
+    lifecycleCallbacks = [];
+
+    for (const callback of callbacks) {
+      callback();
+    }
+  }
+
   function performRender() {
     if (isRendering) {
       throw new Error("Cannot update state while rendering");
     }
 
     isRendering = true;
+    let completed = false;
     try {
       const nextDescriptions = expandDescriptions(currentElement);
 
@@ -92,9 +108,16 @@ export function createRoot(container) {
         nextDescriptions,
         rootContext,
       );
+
+      completed = true;
     } finally {
       isRendering = false;
+
+      if (!completed) {
+        lifecycleCallbacks = [];
+      }
     }
+    flushLifecycleCallbacks();
   }
 
   function render(element) {
@@ -469,6 +492,10 @@ function mountRecords(description, rootContext) {
 
       const [child] = mountRecords(childDescription, rootContext);
       record.child = child;
+
+      if (typeof instance.componentDidMount === "function") {
+        rootContext.enqueueLifecycle(() => instance.componentDidMount());
+      }
 
       return [record];
     }
