@@ -107,4 +107,89 @@ test("keyed movement does not mount a retained component again", () => {
   }
 });
 
+test("update lifecycle receives previous values and sees updated DOM", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  const observations = [];
+  let probe;
+
+  class Probe extends Component {
+    constructor(props) {
+      super(props);
+      probe = this;
+      this.state = { count: 0 };
+    }
+
+    componentDidUpdate(prevProps, prevState) {
+      observations.push(
+        [
+          prevProps.label,
+          prevState.count,
+          this.props.label,
+          this.state.count,
+          fixture.textContent,
+        ].join("|"),
+      );
+    }
+
+    render() {
+      return <p>{this.props.label}:{this.state.count}</p>;
+    }
+  }
+
+  try {
+    root.render(<Probe label="Before" />);
+    probe.setState({ count: 1 });
+    root.render(<Probe label="After" />);
+
+    assertEqual(
+      observations.join(","),
+      "Before|0|Before|1|Before:1,Before|1|After|1|After:1",
+    );
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
+test("nested update lifecycles run child before parent", () => {
+  const fixture = createFixture();
+  const root = createRoot(fixture);
+  const calls = [];
+
+  class Child extends Component {
+    componentDidUpdate() {
+      calls.push(`child:${this.props.value}:${fixture.textContent}`);
+    }
+
+    render() {
+      return <span>{this.props.value}</span>;
+    }
+  }
+
+  class Parent extends Component {
+    componentDidUpdate() {
+      calls.push(`parent:${this.props.value}:${fixture.textContent}`);
+    }
+
+    render() {
+      return (
+        <section>
+          <Child value={this.props.value} />
+        </section>
+      );
+    }
+  }
+
+  try {
+    root.render(<Parent value="one" />);
+    root.render(<Parent value="two" />);
+
+    assertEqual(calls.join(","), "child:two:two,parent:two:two");
+  } finally {
+    root.unmount();
+    fixture.remove();
+  }
+});
+
 await run();

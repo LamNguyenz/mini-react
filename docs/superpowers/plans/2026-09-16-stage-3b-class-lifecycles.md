@@ -392,7 +392,7 @@ git commit -m "feat(stage-3): run mount lifecycles after DOM work"
 - Consumes: `rootContext.enqueueLifecycle(callback)` from Task 2.
 - Produces: `componentDidUpdate(prevProps, prevState)` after child reconciliation, with current values already installed on the instance.
 
-- [ ] **Step 1: Append failing update-value tests before `await run()`**
+- [x] **Step 1: Append failing update-value tests before `await run()`**
 
 ```jsx
 test("update lifecycle receives previous values and sees updated DOM", () => {
@@ -481,7 +481,7 @@ test("nested update lifecycles run child before parent", () => {
 });
 ```
 
-- [ ] **Step 2: Rebuild and verify the update tests fail**
+- [x] **Step 2: Rebuild and verify the update tests fail**
 
 Run:
 
@@ -491,7 +491,7 @@ npm run build:stage3-lifecycle-tests
 
 Expected: `3/5 tests passed`; both new tests fail because update lifecycles are not queued.
 
-- [ ] **Step 3: Capture previous values before updating the instance**
+- [x] **Step 3: Capture previous values before updating the instance**
 
 At the start of the component branch in `reconcileRecord`:
 
@@ -506,7 +506,7 @@ if (oldRecord.kind === "component") {
 
 Keep these references unchanged while rendering and reconciling the next child.
 
-- [ ] **Step 4: Queue the update lifecycle after child reconciliation**
+- [x] **Step 4: Queue the update lifecycle after child reconciliation**
 
 After assigning the reconciled child and record props:
 
@@ -531,7 +531,7 @@ return oldRecord;
 
 The child component registers its callback during recursive reconciliation before the parent reaches this block.
 
-- [ ] **Step 5: Rebuild and verify update behavior**
+- [x] **Step 5: Rebuild and verify update behavior**
 
 Run:
 
@@ -547,7 +547,7 @@ Expected lifecycle page summary:
 
 Refresh the Stage 3 runtime page; expected `42/42 tests passed`.
 
-- [ ] **Step 6: Commit update lifecycle behavior**
+- [x] **Step 6: Commit update lifecycle behavior**
 
 ```bash
 git add src/stage-3/runtime.js tests/stage-3/lifecycle.test.jsx

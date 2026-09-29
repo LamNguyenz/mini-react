@@ -367,6 +367,9 @@ function reconcileRecord(parent, oldRecord, description, rootContext) {
   }
 
   if (oldRecord.kind === "component") {
+    const prevProps = oldRecord.instance.props;
+    const prevState = oldRecord.instance.state;
+
     oldRecord.instance.props = description.props;
     processPendingState(oldRecord);
 
@@ -391,6 +394,13 @@ function reconcileRecord(parent, oldRecord, description, rootContext) {
     );
 
     oldRecord.props = description.props;
+
+    if (typeof oldRecord.instance.componentDidUpdate === "function") {
+      rootContext.enqueueLifecycle(() => {
+        oldRecord.instance.componentDidUpdate(prevProps, prevState);
+      });
+    }
+
     return oldRecord;
   }
 }
