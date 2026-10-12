@@ -37,6 +37,7 @@ export class Component {
         throw new Error("Cannot update state during component construction");
       case "rendering":
         throw new Error("Cannot update state while rendering");
+      case "unmounting":
       case "unmounted":
         throw new Error("Cannot update an unmounted component");
       default:
@@ -62,6 +63,9 @@ export function createRoot(container) {
   let currentElement = null;
   let childRecords = [];
   let lifecycleCallbacks = [];
+  let isPerformingWork = false;
+  let isFlushingLifecycles = false;
+  let renderRequested = false;
 
   if (!(container instanceof HTMLElement)) {
     throw new TypeError("createRoot requires an HTMLElement container");
@@ -79,16 +83,38 @@ export function createRoot(container) {
     },
 
     requestRender() {
-      performRender();
+      renderRequested = true;
+      flushRootWork();
     },
   };
+
+  function flushRootWork() {
+    if (isPerformingWork) return;
+
+    isPerformingWork = true;
+
+    try {
+      while (renderRequested) {
+        renderRequested = false;
+        performRender();
+        flushLifecycleCallbacks();
+      }
+    } finally {
+      isPerformingWork = false;
+    }
+  }
 
   function flushLifecycleCallbacks() {
     const callbacks = lifecycleCallbacks;
     lifecycleCallbacks = [];
 
-    for (const callback of callbacks) {
-      callback();
+    isFlushingLifecycles = true;
+    try {
+      for (const callback of callbacks) {
+        callback();
+      }
+    } finally {
+      isFlushingLifecycles = false;
     }
   }
 
@@ -117,7 +143,6 @@ export function createRoot(container) {
         lifecycleCallbacks = [];
       }
     }
-    flushLifecycleCallbacks();
   }
 
   function render(element) {
@@ -125,7 +150,7 @@ export function createRoot(container) {
       throw Error("Cannot render an unmounted root");
     }
     currentElement = element;
-    performRender();
+    rootContext.requestRender();
   }
 
   function unmount() {
@@ -337,8 +362,8 @@ function processPendingState(record) {
 function reconcileRecord(parent, oldRecord, description, rootContext) {
   if (!hasSameType(oldRecord, description)) {
     const [nextRecord] = mountRecords(description, rootContext);
-    parent.replaceChild(getDom(nextRecord), getDom(oldRecord));
     detachRecord(oldRecord);
+    parent.replaceChild(getDom(nextRecord), getDom(oldRecord));
     return nextRecord;
   }
 
@@ -518,9 +543,18 @@ function mountRecords(description, rootContext) {
 
 function detachRecord(record) {
   if (record.kind === "component") {
-    record.instance.__status = "unmounted";
-    record.instance.__enqueueStateUpdate = null;
-    detachRecord(record.child);
+    const instance = record.instance;
+    instance.__status = "unmounting";
+
+    try {
+      if (typeof instance.componentWillUnmount === "function") {
+        instance.componentWillUnmount();
+      }
+    } finally {
+      detachRecord(record.child);
+      record.instance.__enqueueStateUpdate = null;
+      record.instance.__status = "unmounted";
+    }
   }
   if (record.kind === "host") {
     for (const child of record.children) {
